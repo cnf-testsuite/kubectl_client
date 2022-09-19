@@ -1,12 +1,13 @@
 require "file_utils"
 require "colorize"
 require "totem"
+require "../../../utils/utils.cr"
 
 def kubectl_installation(verbose = false, offline_mode = false)
   gmsg = "No Global kubectl version found"
   lmsg = "No Local kubectl version found"
   gkubectl = kubectl_global_response
-  VERBOSE_LOGGING.info gkubectl if verbose
+  Log.for("verbose").info { gkubectl } if verbose
 
   global_kubectl_version = kubectl_version(gkubectl, "client", verbose)
 
@@ -27,7 +28,7 @@ def kubectl_installation(verbose = false, offline_mode = false)
   end
 
   lkubectl = kubectl_local_response
-  VERBOSE_LOGGING.info lkubectl if verbose
+  Log.for("verbose").info { lkubectl } if verbose
 
   local_kubectl_version = kubectl_version(lkubectl, "client", verbose)
 
@@ -82,17 +83,15 @@ end
 
 def kubectl_global_response(verbose = false)
   status = Process.run("kubectl version", shell: true, output: kubectl_response = IO::Memory.new, error: stderr = IO::Memory.new)
-  VERBOSE_LOGGING.info kubectl_response if verbose
+  Log.for("verbose").info { kubectl_response } if verbose
   kubectl_response.to_s
 end
 
 def kubectl_local_response(verbose = false)
   current_dir = FileUtils.pwd
-  VERBOSE_LOGGING.info current_dir if verbose
-  kubectl = "#{current_dir}/#{TOOLS_DIR}/kubectl/linux-amd64/kubectl"
-  # kubectl_response = `#{kubectl} version`
-  status = Process.run("#{kubectl} version", shell: true, output: kubectl_response = IO::Memory.new, error: stderr = IO::Memory.new)
-  VERBOSE_LOGGING.info kubectl_response.to_s if verbose
+  Log.for("verbose").info { current_dir } if verbose
+  status = Process.run("#{local_kubectl_path} version", shell: true, output: kubectl_response = IO::Memory.new, error: stderr = IO::Memory.new)
+  Log.for("verbose").info { kubectl_response.to_s } if verbose
   kubectl_response.to_s
 end
 
@@ -119,7 +118,7 @@ end
 def kubectl_version(kubectl_response, version_for = "client", verbose = false)
   # version_for can be "client" or "server"
   resp = kubectl_response.match /#{version_for.capitalize} Version: version.Info{(Major:"(([0-9]{1,3})"\, )Minor:"([0-9]{1,3}[+]?)")/
-  VERBOSE_LOGGING.info resp if verbose
+  Log.for("verbose").info { resp } if verbose
 
   if resp
     "#{resp && resp.not_nil![3]}.#{resp && resp.not_nil![4]}"

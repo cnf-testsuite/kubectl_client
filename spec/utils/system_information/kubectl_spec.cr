@@ -1,10 +1,5 @@
 require "../../spec_helper"
-require "colorize"
-require "../../../src/tasks/utils/utils.cr"
-require "../../../src/tasks/prereqs.cr"
 require "../../../src/tasks/utils/system_information/kubectl.cr"
-require "file_utils"
-require "sam"
 
 describe "Kubectl" do
   it "'kubectl_global_response()' should return the information about the kubectl installation", tags: ["kubectl-utils"] do
