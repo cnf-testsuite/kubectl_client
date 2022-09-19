@@ -1,8 +1,9 @@
 require "totem"
 require "colorize"
+require "docker_client"
+require "../../src/utils/utils.cr"
 # require "halite"
 
-# todo put in a separate library. it shold go under ./tools for now
 module KubectlClient
   alias K8sManifest = JSON::Any
   alias K8sManifestList = Array(JSON::Any)

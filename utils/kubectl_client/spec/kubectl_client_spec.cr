@@ -1,5 +1,6 @@
 require "./spec_helper"
 require "../kubectl_client.cr"
+require "../../../src/utils/utils.cr"
 require "file_utils"
 # require "sam"
 
@@ -51,12 +52,12 @@ describe "KubectlClient" do
     empty_json_any = JSON.parse(%({}))
     nodes = [empty_json_any]
     until (nodes != [empty_json_any]) || retries > retry_limit
-      KubectlClient::LOGGING.info "schedulable_node retry: #{retries}"
+      Log.info {"schedulable_node retry: #{retries}"}
       sleep 1.0
       nodes = KubectlClient::Get.schedulable_nodes_list
       retries = retries + 1
     end
-    KubectlClient::LOGGING.info "schedulable_node node: #{nodes}"
+    Log.info {"schedulable_node node: #{nodes}"}
     (nodes).should_not be_nil
     if nodes && nodes[0] != Nil
       (nodes.size).should be > 0
@@ -77,11 +78,11 @@ describe "KubectlClient" do
     empty_json_any = JSON.parse(%({}))
     filtered_nodes = [empty_json_any]
     until (filtered_nodes != [empty_json_any]) || retries > retry_limit
-      KubectlClient::LOGGING.info "resource_map retry: #{retries}"
+      Log.info {"resource_map retry: #{retries}"}
       sleep 1.0
       filtered_nodes = KubectlClient::Get.resource_map(KubectlClient::Get.nodes) do |item, metadata|
         taints = item.dig?("spec", "taints")
-        KubectlClient::LOGGING.debug "taints: #{taints}"
+        Log.debug {"taints: #{taints}"}
         if (taints && taints.dig?("effect") == "NoSchedule")
           nil
         else
@@ -90,7 +91,7 @@ describe "KubectlClient" do
       end
       retries = retries + 1
     end
-    KubectlClient::LOGGING.info "spec: resource_map node: #{filtered_nodes}"
+    Log.info {"spec: resource_map node: #{filtered_nodes}"}
     (filtered_nodes).should_not be_nil
     if filtered_nodes
       (filtered_nodes.size).should be > 0
@@ -135,12 +136,12 @@ describe "KubectlClient" do
     retries = 1
     nodes = nil
     until (nodes && nodes.size > 0 && !nodes[0].empty?) || retries > retry_limit
-      KubectlClient::LOGGING.info "schedulable_node retry: #{retries}"
+      Log.info {"schedulable_node retry: #{retries}"}
       sleep 1.0
       nodes = KubectlClient::Get.schedulable_nodes
       retries = retries + 1
     end
-    KubectlClient::LOGGING.info "schedulable_node node: #{nodes}"
+    Log.info {"schedulable_node node: #{nodes}"}
     # resp = KubectlClient::Get.schedulable_nodes
     (nodes).should_not be_nil
     if nodes 
@@ -151,38 +152,38 @@ describe "KubectlClient" do
   end
 
   it "'#KubectlClient.containers' should return all containers defined in a deployment", tags: ["kubectl-deployment"]  do
-    # KubectlClient::LOGGING.debug `./cnf-testsuite cnf_setup cnf-config=./sample-cnfs/k8s-sidecar-container-pattern/cnf-testsuite.yml wait_count=0` 
+    # Log.debug {`./cnf-testsuite cnf_setup cnf-config=./sample-cnfs/k8s-sidecar-container-pattern/cnf-testsuite.yml wait_count=0`}
     KubectlClient::Apply.file("./utils/kubectl_client/spec/fixtures/sidecar_manifest.yml")
     resp = KubectlClient::Get.deployment_containers("nginx-webapp")
     (resp.size).should be > 0
   ensure
-    # KubectlClient::LOGGING.debug `./cnf-testsuite cnf_cleanup cnf-config=./sample-cnfs/k8s-sidecar-container-pattern/cnf-testsuite.yml deploy_with_chart=false` 
+    # Log.debug  {`./cnf-testsuite cnf_cleanup cnf-config=./sample-cnfs/k8s-sidecar-container-pattern/cnf-testsuite.yml deploy_with_chart=false` }
     KubectlClient::Delete.file("./utils/kubectl_client/spec/fixtures/sidecar_manifest.yml")
   end
 
   it "'#KubectlClient.pod_exists?' should true if a pod exists", tags: ["kubectl-status"]  do
-    # KubectlClient::LOGGING.debug `./cnf-testsuite cnf_setup cnf-config=./sample-cnfs/sample-generic-cnf/cnf-testsuite.yml` 
+    # Log.debug {`./cnf-testsuite cnf_setup cnf-config=./sample-cnfs/sample-generic-cnf/cnf-testsuite.yml` }
     KubectlClient::Apply.file("./utils/kubectl_client/spec/fixtures/coredns_manifest.yml")
     resp = KubectlClient::Get.pod_exists?("coredns")
     (resp).should be_true 
   ensure
-    # KubectlClient::LOGGING.debug `./cnf-testsuite cnf_cleanup cnf-config=./sample-cnfs/sample-generic-cnf/cnf-testsuite.yml` 
+    # Log.debug {`./cnf-testsuite cnf_cleanup cnf-config=./sample-cnfs/sample-generic-cnf/cnf-testsuite.yml` }
     KubectlClient::Delete.file("./utils/kubectl_client/spec/fixtures/coredns_manifest.yml")
   end
  
   it "'#KubectlClient.pod_status' should return a status of false if the pod is not installed (failed to install) and other pods exist", tags: ["kubectl-status"]  do
     # cnf="./sample-cnfs/sample-coredns-cnf"
-    # KubectlClient::LOGGING.info `./cnf-testsuite cnf_setup cnf-path=#{cnf}`
-    # KubectlClient::LOGGING.info `./cnf-testsuite uninstall_dockerd`
+    # Log.info {`./cnf-testsuite cnf_setup cnf-path=#{cnf}`}
+    # Log.info {`./cnf-testsuite uninstall_dockerd`}
     KubectlClient::Apply.file("./utils/kubectl_client/spec/fixtures/coredns_manifest.yml")
     KubectlClient::Apply.file("./utils/kubectl_client/spec/fixtures/manifest.yml")
     KubectlClient::Delete.file("./utils/kubectl_client/spec/fixtures/manifest.yml")
 
     resp = KubectlClient::Get.pod_status(pod_name_prefix: "dockerd").split(",")[2] # true/false
-    KubectlClient::LOGGING.info resp 
+    Log.info { resp }
     (resp && !resp.empty? && resp == "true").should be_false
   ensure
-    # KubectlClient::LOGGING.info `./cnf-testsuite cnf_cleanup cnf-path=#{cnf}`
+    # Log.info {`./cnf-testsuite cnf_cleanup cnf-path=#{cnf}`}
     KubectlClient::Delete.file("./utils/kubectl_client/spec/fixtures/coredns_manifest.yml")
   end
 
@@ -193,7 +194,7 @@ describe "KubectlClient" do
     KubectlClient::Get.resource_wait_for_install("Pod", "dockerd")
 
     resp = KubectlClient::Get.pod_status(pod_name_prefix: "dockerd").split(",")[2] # true/false
-    KubectlClient::LOGGING.info resp 
+    Log.info { resp }
     (resp && !resp.empty? && resp == "true").should be_true
   ensure
     KubectlClient::Delete.file("./utils/kubectl_client/spec/fixtures/coredns_manifest.yml")

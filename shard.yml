@@ -16,5 +16,8 @@ dependencies:
   totem:
     github: icyleaf/totem
     version: ~> 0.7.0
+  docker_client:
+    github: cnf-testsuite/docker_client
+    branch: main
 
 license: MIT
