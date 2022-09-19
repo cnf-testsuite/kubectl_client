@@ -1,0 +1,20 @@
+name: kubectl_client
+version: 0.1.0
+
+authors:
+  - William Harris <wharris@upscalews.com>
+  - W. Watson <Watson@vulk.coop>
+  - Denver Williams <denver@debian.nz>
+
+targets:
+  kubectl_client:
+    main: kubectl_client.cr
+
+crystal: '>= 1.0.0'
+
+dependencies:
+  totem:
+    github: icyleaf/totem
+    version: ~> 0.7.0
+
+license: MIT
