@@ -101,7 +101,7 @@ describe "KubectlClient" do
   end
 
   it "'Kubectl::Get.wait_for_install' should wait for a cnf to be installed", tags: ["kubectl-install"]  do
-    (KubectlClient::Apply.file("./utils/kubectl_client/spec/fixtures/coredns_manifest.yml")).should be_true
+    (KubectlClient::Apply.file("./utils/kubectl_client/spec/fixtures/coredns_manifest.yml")).should be_truthy
 
     KubectlClient::Get.wait_for_install("coredns-coredns")
     current_replicas = `kubectl get deployments coredns-coredns -o=jsonpath='{.status.readyReplicas}'`
@@ -109,7 +109,7 @@ describe "KubectlClient" do
   end
 
   it "'Kubectl::Get.resource_wait_for_uninstall' should wait for a cnf to be installed", tags: ["kubectl-install"]  do
-    (KubectlClient::Apply.file("./utils/kubectl_client/spec/fixtures/wordpress_manifest.yml")).should be_true
+    (KubectlClient::Apply.file("./utils/kubectl_client/spec/fixtures/wordpress_manifest.yml")).should be_truthy
 
     KubectlClient::Delete.file("./utils/kubectl_client/spec/fixtures/wordpress_manifest.yml")
     resp = KubectlClient::Get.resource_wait_for_uninstall("deployment", "wordpress")
