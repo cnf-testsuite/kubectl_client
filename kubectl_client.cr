@@ -41,8 +41,8 @@ module KubectlClient
     end
   end
 
-  def self.installation_found?
-    kubectl_installation.includes?("kubectl found")
+  def self.installation_found?(verbose = false, offline_mode = false)
+    kubectl_installation(verbose = false, offline_mode = false).includes?("kubectl found")
   end
 
   def self.wait(cmd)

@@ -9,7 +9,7 @@ describe "KubectlClient" do
   # end
 
   it "'installation_found?' should show a kubectl client was located",  do
-    (KubectlClient.installation_found?).should be_true
+    (KubectlClient.installation_found?(false, true)).should be_true
   end
 
   it "'#KubectlClient.pods_by_node' should return all pods on a specific node", tags: ["kubectl-nodes"]  do
