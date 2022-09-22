@@ -2,6 +2,7 @@ require "totem"
 require "colorize"
 require "docker_client"
 require "./src/utils/utils.cr"
+require "./src/utils/system_information.cr"
 
 module KubectlClient
   alias K8sManifest = JSON::Any
@@ -38,6 +39,10 @@ module KubectlClient
       end
       {status: status, output: output.to_s, error: stderr.to_s}
     end
+  end
+
+  def self.installation_found?
+    kubectl_installation.includes?("kubectl found")
   end
 
   def self.wait(cmd)

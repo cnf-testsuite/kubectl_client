@@ -1,12 +1,16 @@
 require "./spec_helper"
 require "../kubectl_client.cr"
 require "../src/utils/utils.cr"
+require "../src/utils/system_information.cr"
 require "file_utils"
 
 describe "KubectlClient" do
   # after_all do
   # end
 
+  it "'installation_found?' should show a kubectl client was located",  do
+    (KubectlClient.installation_found?).should be_true
+  end
 
   it "'#KubectlClient.pods_by_node' should return all pods on a specific node", tags: ["kubectl-nodes"]  do
     pods = KubectlClient::Get.pods_by_nodes(KubectlClient::Get.schedulable_nodes_list)
