@@ -1,8 +1,7 @@
 require "./spec_helper"
 require "../kubectl_client.cr"
-require "../../../src/utils/utils.cr"
+require "../src/utils/utils.cr"
 require "file_utils"
-# require "sam"
 
 describe "KubectlClient" do
   # after_all do
@@ -27,7 +26,7 @@ describe "KubectlClient" do
 
   it "'#KubectlClient.pods_by_label' should return all pods on a specific node", tags: ["kubectl-nodes"]  do
     # AirGap.bootstrap_cluster()
-    KubectlClient::Apply.file("./utils/kubectl_client/spec/fixtures/manifest.yml")
+    (KubectlClient::Apply.file("./spec/fixtures/manifest.yml")).should be_truthy
     pods = KubectlClient::Get.pods_by_nodes(KubectlClient::Get.schedulable_nodes_list)
     (pods).should_not be_nil
     pods = KubectlClient::Get.pods_by_label(pods, "name", "dockerd")
@@ -101,7 +100,7 @@ describe "KubectlClient" do
   end
 
   it "'Kubectl::Get.wait_for_install' should wait for a cnf to be installed", tags: ["kubectl-install"]  do
-    (KubectlClient::Apply.file("./utils/kubectl_client/spec/fixtures/coredns_manifest.yml")).should be_truthy
+    (KubectlClient::Apply.file("./spec/fixtures/coredns_manifest.yml")).should be_truthy
 
     KubectlClient::Get.wait_for_install("coredns-coredns")
     current_replicas = `kubectl get deployments coredns-coredns -o=jsonpath='{.status.readyReplicas}'`
@@ -109,9 +108,9 @@ describe "KubectlClient" do
   end
 
   it "'Kubectl::Get.resource_wait_for_uninstall' should wait for a cnf to be installed", tags: ["kubectl-install"]  do
-    (KubectlClient::Apply.file("./utils/kubectl_client/spec/fixtures/wordpress_manifest.yml")).should be_truthy
+    (KubectlClient::Apply.file("./spec/fixtures/wordpress_manifest.yml")).should be_truthy
 
-    KubectlClient::Delete.file("./utils/kubectl_client/spec/fixtures/wordpress_manifest.yml")
+    KubectlClient::Delete.file("./spec/fixtures/wordpress_manifest.yml")
     resp = KubectlClient::Get.resource_wait_for_uninstall("deployment", "wordpress")
     (resp).should be_true
   end
@@ -153,52 +152,52 @@ describe "KubectlClient" do
 
   it "'#KubectlClient.containers' should return all containers defined in a deployment", tags: ["kubectl-deployment"]  do
     # Log.debug {`./cnf-testsuite cnf_setup cnf-config=./sample-cnfs/k8s-sidecar-container-pattern/cnf-testsuite.yml wait_count=0`}
-    KubectlClient::Apply.file("./utils/kubectl_client/spec/fixtures/sidecar_manifest.yml")
+    KubectlClient::Apply.file("./spec/fixtures/sidecar_manifest.yml")
     resp = KubectlClient::Get.deployment_containers("nginx-webapp")
     (resp.size).should be > 0
   ensure
     # Log.debug  {`./cnf-testsuite cnf_cleanup cnf-config=./sample-cnfs/k8s-sidecar-container-pattern/cnf-testsuite.yml deploy_with_chart=false` }
-    KubectlClient::Delete.file("./utils/kubectl_client/spec/fixtures/sidecar_manifest.yml")
+    KubectlClient::Delete.file("./spec/fixtures/sidecar_manifest.yml")
   end
 
   it "'#KubectlClient.pod_exists?' should true if a pod exists", tags: ["kubectl-status"]  do
     # Log.debug {`./cnf-testsuite cnf_setup cnf-config=./sample-cnfs/sample-generic-cnf/cnf-testsuite.yml` }
-    KubectlClient::Apply.file("./utils/kubectl_client/spec/fixtures/coredns_manifest.yml")
+    KubectlClient::Apply.file("./spec/fixtures/coredns_manifest.yml")
     resp = KubectlClient::Get.pod_exists?("coredns")
     (resp).should be_true 
   ensure
     # Log.debug {`./cnf-testsuite cnf_cleanup cnf-config=./sample-cnfs/sample-generic-cnf/cnf-testsuite.yml` }
-    KubectlClient::Delete.file("./utils/kubectl_client/spec/fixtures/coredns_manifest.yml")
+    KubectlClient::Delete.file("./spec/fixtures/coredns_manifest.yml")
   end
  
   it "'#KubectlClient.pod_status' should return a status of false if the pod is not installed (failed to install) and other pods exist", tags: ["kubectl-status"]  do
     # cnf="./sample-cnfs/sample-coredns-cnf"
     # Log.info {`./cnf-testsuite cnf_setup cnf-path=#{cnf}`}
     # Log.info {`./cnf-testsuite uninstall_dockerd`}
-    KubectlClient::Apply.file("./utils/kubectl_client/spec/fixtures/coredns_manifest.yml")
-    KubectlClient::Apply.file("./utils/kubectl_client/spec/fixtures/manifest.yml")
-    KubectlClient::Delete.file("./utils/kubectl_client/spec/fixtures/manifest.yml")
+    KubectlClient::Apply.file("./spec/fixtures/coredns_manifest.yml")
+    KubectlClient::Apply.file("./spec/fixtures/manifest.yml")
+    KubectlClient::Delete.file("./spec/fixtures/manifest.yml")
 
     resp = KubectlClient::Get.pod_status(pod_name_prefix: "dockerd").split(",")[2] # true/false
     Log.info { resp }
     (resp && !resp.empty? && resp == "true").should be_false
   ensure
     # Log.info {`./cnf-testsuite cnf_cleanup cnf-path=#{cnf}`}
-    KubectlClient::Delete.file("./utils/kubectl_client/spec/fixtures/coredns_manifest.yml")
+    KubectlClient::Delete.file("./spec/fixtures/coredns_manifest.yml")
   end
 
   it "'#KubectlClient.pod_status' should return a status of true if the pod is installed and other pods exist", tags: ["kubectl-status"]  do
     cnf="./sample-cnfs/sample-coredns-cnf"
-    KubectlClient::Apply.file("./utils/kubectl_client/spec/fixtures/coredns_manifest.yml")
-    KubectlClient::Apply.file("./utils/kubectl_client/spec/fixtures/dockerd_manifest.yml")
+    KubectlClient::Apply.file("./spec/fixtures/coredns_manifest.yml")
+    KubectlClient::Apply.file("./spec/fixtures/dockerd_manifest.yml")
     KubectlClient::Get.resource_wait_for_install("Pod", "dockerd")
 
     resp = KubectlClient::Get.pod_status(pod_name_prefix: "dockerd").split(",")[2] # true/false
     Log.info { resp }
     (resp && !resp.empty? && resp == "true").should be_true
   ensure
-    KubectlClient::Delete.file("./utils/kubectl_client/spec/fixtures/coredns_manifest.yml")
-    KubectlClient::Delete.file("./utils/kubectl_client/spec/fixtures/dockerd_manifest.yml")
+    KubectlClient::Delete.file("./spec/fixtures/coredns_manifest.yml")
+    KubectlClient::Delete.file("./spec/fixtures/dockerd_manifest.yml")
   end
 end
 

@@ -1,5 +1,5 @@
-require "../../spec_helper"
-require "../../../src/tasks/utils/system_information/kubectl.cr"
+require "../spec_helper"
+require "../../src/utils/system_information.cr"
 
 describe "Kubectl" do
   it "'kubectl_global_response()' should return the information about the kubectl installation", tags: ["kubectl-utils"] do

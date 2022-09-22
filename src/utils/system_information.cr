@@ -1,7 +1,7 @@
 require "file_utils"
 require "colorize"
 require "totem"
-require "../../../utils/utils.cr"
+require "./utils.cr"
 
 def kubectl_installation(verbose = false, offline_mode = false)
   gmsg = "No Global kubectl version found"

@@ -1,8 +1,7 @@
 require "totem"
 require "colorize"
 require "docker_client"
-require "../../src/utils/utils.cr"
-# require "halite"
+require "./src/utils/utils.cr"
 
 module KubectlClient
   alias K8sManifest = JSON::Any
