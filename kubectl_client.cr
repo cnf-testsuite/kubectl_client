@@ -231,6 +231,13 @@ module KubectlClient
     end
   end
 
+  module Replace
+    def self.command(cli : String)
+      cmd = "kubectl replace #{cli}"
+      ShellCmd.run(cmd, "KubectlClient::Replace.command")
+    end
+  end
+
   module Utils
     # Using sleep() to wait for terminating resources is unreliable.
     #
