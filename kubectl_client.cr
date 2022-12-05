@@ -231,6 +231,14 @@ module KubectlClient
     end
   end
 
+  module Replace
+    def self.command(cli : String)
+      cmd = "kubectl replace #{cli}"
+      ShellCmd.run(cmd, "KubectlClient::Replace.command")
+    end
+  end
+
+
   module Utils
     # Using sleep() to wait for terminating resources is unreliable.
     #
@@ -567,12 +575,17 @@ module KubectlClient
       end
     end
 
-    def self.deployment(deployment_name) : JSON::Any
-      cmd = "kubectl get deployment #{deployment_name} -o json"
+    def self.deployment(deployment_name : String, namespace : String | Nil = nil) : JSON::Any
+
+      namespace_opt = ""
+      if namespace != nil
+        namespace_opt = "-n #{namespace}"
+      end
+      cmd = "kubectl get deployment #{deployment_name} -o json #{namespace_opt}"
       result = ShellCmd.run(cmd, "KubectlClient::Get.deployment")
       response = result[:output]
       if result[:status].success? && !response.empty?
-        JSON.parse(resp)
+        JSON.parse(response)
       else
         JSON.parse(%({}))
       end
@@ -1126,6 +1139,7 @@ module KubectlClient
     def self.deployment_spec_labels(deployment_name) : JSON::Any
       resource_spec_labels("deployment", deployment_name)
     end
+
     def self.resource_spec_labels(kind : String, resource_name : String, namespace : String | Nil = nil) : JSON::Any
       Log.debug { "resource_labels kind: #{kind} resource_name: #{resource_name}" }
       if kind.downcase == "service"
