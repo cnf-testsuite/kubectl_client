@@ -48,6 +48,15 @@ describe "KubectlClient" do
     end
   end
 
+  it "'#KubectlClient.wait_for_resource_key_value' should wait for a resource and key/value combination", tags: ["kubectl-nodes"]  do
+    (KubectlClient::Apply.file("./spec/fixtures/coredns_manifest.yml")).should be_truthy
+    is_ready = KubectlClient::Get.wait_for_resource_key_value("Deployment", "coredns-coredns", {"spec", "replicas"}, "1")
+    # is_ready = KubectlClient::Get.wait_for_resource_key_value("Deployment", "coredns-coredns", {"spec", "replicas"})
+    (is_ready).should be_true
+  ensure
+    `kubectl delete -f ./spec/fixtures/coredns_manifest.yml`
+  end
+
 
   it "'#KubectlClient.schedulable_nodes_list' should return all schedulable worker nodes", tags: ["kubectl-nodes"]  do
     retry_limit = 50

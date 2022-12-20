@@ -907,6 +907,67 @@ module KubectlClient
       result[:output].to_i
     end
 
+    def self.wait_for_resource_key_value(
+          kind : String,
+          resource_name : String,
+          dig_params : Tuple,
+          value : (String | Nil) = nil,
+          wait_count : Int32 = 180,
+          namespace : String = "default",
+          kubeconfig : String | Nil = nil
+        )
+      is_key_ready = false
+      case kind.downcase
+      when "pod", "replicaset", "deployment", "statefulset", "daemonset"
+        is_ready = resource_wait_for_install(kind, resource_name, wait_count, namespace, kubeconfig)
+      else
+        is_ready = resource_desired_is_available?(kind,resource_name, namespace)
+      end
+      resource = KubectlClient::Get.resource(kind, resource_name, namespace) 
+      if is_ready
+        is_key_ready = wait_for_key_value(resource, dig_params, value, wait_count)
+      else 
+        is_key_ready = false
+      end
+      is_key_ready
+    end
+
+    def self.wait_for_key_value(resource,
+                                dig_params : Tuple,
+                                value : (String | Nil) = nil,
+                                wait_count : Int32 = 15)
+
+      Log.info { "wait_for_key_value: params, value: #{dig_params}, #{value}" }
+			second_count = 0         
+			key_created = false        
+			value_matched = false        
+			until (key_created && value_matched) || second_count > wait_count.to_i
+				sleep 3                
+        namespace = resource.dig?("metadata", "namespace")
+        if namespace
+				  resource = KubectlClient::Get.resource(resource["kind"].as_s, resource.dig("metadata", "name").as_s) 
+        else
+				  resource = KubectlClient::Get.resource(resource["kind"].as_s, resource.dig("metadata", "name").as_s, namespace) 
+        end
+
+        Log.info { "resource.dig?(*dig_params): #{value}, #{resource.dig?(*dig_params)}" }
+        if resource.dig?(*dig_params)
+					key_created=true
+          Log.info { "value == {resource.dig(*dig_params)}: #{value}, #{resource.dig(*dig_params)}" }
+          if value == nil
+            value_matched = true
+          elsif value == "#{resource.dig(*dig_params)}"
+            Log.info { "Value matched: true" }
+            value_matched = true
+          end
+				end
+        Log.info { "second count: #{second_count}" }
+        Log.debug { "resource: params: #{resource}, #{dig_params}" }
+				second_count = second_count + 1 
+			end
+      key_created && value_matched
+    end
+
     def self.resource_wait_for_install(
       kind : String,
       resource_name : String,
@@ -976,8 +1037,27 @@ module KubectlClient
       end
     end
 
-    def self.resource_desired_is_available?(kind : String, resource_name)
+    def self.wait_for_resource_availability(kind : String,
+                                            resource_name,
+                                            namespace = "default",
+                                            wait_count : Int32 = 180)
+
+      Log.info { "wait_for_resource_availability kind, name: #{kind} #{resource_name}" }
+      second_count = 0
+      resource_created = false
+      until (resource_created) || second_count > wait_count.to_i
+        sleep 3
+        resource_created = resource_desired_is_available?(kind, resource_name, namespace) 
+        second_count = second_count + 1 
+      end
+      resource_created 
+    end
+
+    def self.resource_desired_is_available?(kind : String, resource_name, namespace = "default")
       cmd = "kubectl get #{kind} #{resource_name} -o=yaml"
+      if namespace
+        cmd = "#{cmd} -n #{namespace}"
+      end
       result = ShellCmd.run(cmd, "resource_desired_is_available?")
       resp = result[:output]
 
