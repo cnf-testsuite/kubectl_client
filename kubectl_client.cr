@@ -282,7 +282,7 @@ module KubectlClient
       resource_name : String,
       container_name : String,
       image_name : String,
-      version_tag String | Nil = nil,
+      version_tag : String | Nil = nil,
       namespace : String | Nil = nil
     ) : Bool
       # use --record when setting image to have history
