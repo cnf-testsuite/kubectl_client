@@ -114,8 +114,8 @@ module KubectlClient
       result[:status].success?
     end
 
-    def self.undo(deployment_name, namespace : String | Nil = nil) : Bool
-      cmd = "kubectl rollout undo deployment/#{deployment_name}"
+    def self.undo(kind : String, resource_name : String, namespace : String | Nil = nil) : Bool
+      cmd = "kubectl rollout undo #{kind}/#{resource_name}"
       if namespace
         cmd = "#{cmd} -n #{namespace}"
       end
