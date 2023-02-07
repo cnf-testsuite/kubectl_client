@@ -113,7 +113,7 @@ module KubectlClient
       result[:status].success?
     end
 
-    def self.resource_status(kind, resource_name, namespace : String | Nil = nil, timeout : String = "30s") : Bool
+    def self.resource_status(kind : String, resource_name: String, namespace : String | Nil = nil, timeout : String = "30s") : Bool
       cmd = "kubectl rollout status #{kind}/#{resource_name} --timeout=#{timeout}"
       if namespace
         cmd = "#{cmd} -n #{namespace}"
