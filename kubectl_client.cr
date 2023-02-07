@@ -109,7 +109,7 @@ module KubectlClient
       if namespace
         cmd = "#{cmd} -n #{namespace}"
       end
-      result = ShellCmd.run(cmd, "KubectlClient::Rollout.resource_status")
+      result = ShellCmd.run(cmd, "KubectlClient::Rollout.status")
       Log.debug { "rollout status: #{result[:status].success?}" }
       result[:status].success?
     end
