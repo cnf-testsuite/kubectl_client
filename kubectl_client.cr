@@ -104,27 +104,18 @@ module KubectlClient
   end
 
   module Rollout
-    def self.status(deployment_name, namespace : String | Nil = nil, timeout="30s") : Bool
-      cmd = "kubectl rollout status deployment/#{deployment_name} --timeout=#{timeout}"
-      if namespace
-        cmd = "#{cmd} -n #{namespace}"
-      end
-      result = ShellCmd.run(cmd, "KubectlClient::Rollout.status")
-      result[:status].success?
-    end
-
-    def self.resource_status(kind, resource_name, namespace : String | Nil = nil, timeout : String = "30s") : Bool
+    def self.status(kind : String, resource_name : String, namespace : String | Nil = nil, timeout : String = "30s") : Bool
       cmd = "kubectl rollout status #{kind}/#{resource_name} --timeout=#{timeout}"
       if namespace
         cmd = "#{cmd} -n #{namespace}"
       end
-      result = ShellCmd.run(cmd, "KubectlClient::Rollout.resource_status")
+      result = ShellCmd.run(cmd, "KubectlClient::Rollout.status")
       Log.debug { "rollout status: #{result[:status].success?}" }
       result[:status].success?
     end
 
-    def self.undo(deployment_name, namespace : String | Nil = nil) : Bool
-      cmd = "kubectl rollout undo deployment/#{deployment_name}"
+    def self.undo(kind : String, resource_name : String, namespace : String | Nil = nil) : Bool
+      cmd = "kubectl rollout undo #{kind}/#{resource_name}"
       if namespace
         cmd = "#{cmd} -n #{namespace}"
       end
@@ -286,14 +277,21 @@ module KubectlClient
   end
 
   module Set
-    def self.image(deployment_name, container_name, image_name, version_tag=nil, namespace : String | Nil = nil) : Bool
+    def self.image(
+      resource_kind : String,
+      resource_name : String,
+      container_name : String,
+      image_name : String,
+      version_tag : String | Nil = nil,
+      namespace : String | Nil = nil
+    ) : Bool
       # use --record when setting image to have history
       #TODO check if image exists in repo? DockerClient::Get.image and image_by_tags
       cmd = ""
       if version_tag
-        cmd = "kubectl set image deployment/#{deployment_name} #{container_name}=#{image_name}:#{version_tag} --record"
+        cmd = "kubectl set image #{resource_kind}/#{resource_name} #{container_name}=#{image_name}:#{version_tag} --record"
       else
-        cmd = "kubectl set image deployment/#{deployment_name} #{container_name}=#{image_name} --record"
+        cmd = "kubectl set image #{resource_kind}/#{resource_name} #{container_name}=#{image_name} --record"
       end
       if namespace
         cmd = "#{cmd} -n #{namespace}"
