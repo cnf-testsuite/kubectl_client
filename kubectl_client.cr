@@ -39,6 +39,27 @@ module KubectlClient
       end
       {status: status, output: output.to_s, error: stderr.to_s}
     end
+
+    def self.new(cmd, log_prefix, force_output=false)
+      Log.info { "#{log_prefix} command: #{cmd}" }
+      status = Process.new(
+        cmd,
+        shell: true,
+        output: output = IO::Memory.new,
+        error: stderr = IO::Memory.new
+      )
+      if force_output == false
+        Log.debug { "#{log_prefix} output: #{output.to_s}" }
+      else
+        Log.info { "#{log_prefix} output: #{output.to_s}" }
+      end
+
+      # Don't have to output log line if stderr is empty
+      if stderr.to_s.size > 1
+        Log.info { "#{log_prefix} stderr: #{stderr.to_s}" }
+      end
+      {status: status, output: output.to_s, error: stderr.to_s}
+    end
   end
 
   def self.installation_found?(verbose = false, offline_mode = false)
@@ -79,14 +100,18 @@ module KubectlClient
     ShellCmd.run(cmd, "KubectlClient.describe", force_output: force_output)
   end
 
-  def self.exec(command, namespace : String | Nil = nil, force_output : Bool = false)
+  def self.exec(command, namespace : String | Nil = nil, force_output : Bool = false, background=false)
     full_cmd = ["kubectl", "exec"]
     if namespace
       full_cmd << "-n #{namespace}"
     end
     full_cmd << command
     full_cmd = full_cmd.join(" ")
-    ShellCmd.run(full_cmd, "KubectlClient.exec", force_output)
+    if background
+      ShellCmd.new(full_cmd, "KubectlClient.exec", force_output)
+    else
+      ShellCmd.run(full_cmd, "KubectlClient.exec", force_output)
+    end
   end
 
   def self.cp(command)
