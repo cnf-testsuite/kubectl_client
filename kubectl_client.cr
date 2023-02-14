@@ -42,7 +42,7 @@ module KubectlClient
 
     def self.new(cmd, log_prefix, force_output=false)
       Log.info { "#{log_prefix} command: #{cmd}" }
-      status = Process.new(
+      process = Process.new(
         cmd,
         shell: true,
         output: output = IO::Memory.new,
@@ -58,7 +58,7 @@ module KubectlClient
       if stderr.to_s.size > 1
         Log.info { "#{log_prefix} stderr: #{stderr.to_s}" }
       end
-      {status: status, output: output.to_s, error: stderr.to_s}
+      {process: process, output: output.to_s, error: stderr.to_s}
     end
   end
 
@@ -100,18 +100,25 @@ module KubectlClient
     ShellCmd.run(cmd, "KubectlClient.describe", force_output: force_output)
   end
 
-  def self.exec(command, namespace : String | Nil = nil, force_output : Bool = false, background=false)
+  def self.exec(command, namespace : String | Nil = nil, force_output : Bool = false)
+    full_cmd = construct_exec_cmd(command, namespace)
+    ShellCmd.run(full_cmd, "KubectlClient.exec", force_output)
+  end
+
+  def self.exec_bg(command, namespace : String | Nil = nil, force_output : Bool = false)
+    full_cmd = construct_exec_cmd(command, namespace)
+    ShellCmd.new(full_cmd, "KubectlClient.exec_bg", force_output)
+  end
+
+  # Returns a command as a string to be used in exec or exec_bg
+  def self.construct_exec_cmd(command, namespace : String | Nil = nil) : String
     full_cmd = ["kubectl", "exec"]
     if namespace
       full_cmd << "-n #{namespace}"
     end
     full_cmd << command
     full_cmd = full_cmd.join(" ")
-    if background
-      ShellCmd.new(full_cmd, "KubectlClient.exec", force_output)
-    else
-      ShellCmd.run(full_cmd, "KubectlClient.exec", force_output)
-    end
+    return full_cmd
   end
 
   def self.cp(command)
@@ -129,6 +136,23 @@ module KubectlClient
   end
 
   module Rollout
+    # DEPRECATED: Added only for smooth transition from bug/1726 to main branch
+    def self.status(resource_name : String, namespace : String | Nil = nil, timeout : String = "30s") : Bool
+      Log.info { "Decrecated method. Pass kind in the args KubectlClient::Rollout.status(kind, resource_name, namespace, timeout)" }
+      status(kind: "deployment", resource_name: resource_name, namespace: namespace, timeout: timeout)
+    end
+
+    # DEPRECATED: Added only for smooth transition from bug/1726 to main branch
+    def self.undo(resource_name : String, namespace : String | Nil = nil) : Bool
+      Log.info { "Decrecated method. Pass kind in the args KubectlClient::Rollout.undo(kind, resource_name, namespace)" }
+      undo(kind: "deployment", resource_name: resource_name, namespace: namespace)
+    end
+
+    # DEPRECATED: Added only for smooth transition from bug/1726 to main branch
+    def self.resource_status(kind : String, resource_name : String, namespace : String | Nil = nil, timeout : String = "30s") : Bool
+      status(kind: kind, resource_name: resource_name, namespace: namespace, timeout: timeout)
+    end
+
     def self.status(kind : String, resource_name : String, namespace : String | Nil = nil, timeout : String = "30s") : Bool
       cmd = "kubectl rollout status #{kind}/#{resource_name} --timeout=#{timeout}"
       if namespace
@@ -323,6 +347,24 @@ module KubectlClient
       end
       result = ShellCmd.run(cmd, "KubectlClient::Set.image")
       result[:status].success?
+    end
+
+    # DEPRECATED: Added only for smooth transition from bug/1726 to main branch
+    def self.image(
+      resource_name : String,
+      container_name : JSON::Any,
+      image_name : String,
+      version_tag : String | Nil = nil,
+      namespace : String | Nil = nil
+    ) : Bool
+      return image(
+        resource_kind: "deployment",
+        resource_name: resource_name,
+        container_name: container_name.as_s,
+        image_name: image_name,
+        version_tag: version_tag,
+        namespace: namespace
+      )
     end
   end
 
