@@ -100,18 +100,25 @@ module KubectlClient
     ShellCmd.run(cmd, "KubectlClient.describe", force_output: force_output)
   end
 
-  def self.exec(command, namespace : String | Nil = nil, force_output : Bool = false, background=false)
+  def self.exec(command, namespace : String | Nil = nil, force_output : Bool = false)
+    full_cmd = construct_exec_cmd(command, namespace)
+    ShellCmd.run(full_cmd, "KubectlClient.exec", force_output)
+  end
+
+  def self.exec_bg(command, namespace : String | Nil = nil, force_output : Bool = false)
+    full_cmd = construct_exec_cmd(command, namespace)
+    ShellCmd.new(full_cmd, "KubectlClient.exec_bg", force_output)
+  end
+
+  # Returns a command as a string to be used in exec or exec_bg
+  def self.construct_exec_cmd(command, namespace : String | Nil = nil) : String
     full_cmd = ["kubectl", "exec"]
     if namespace
       full_cmd << "-n #{namespace}"
     end
     full_cmd << command
     full_cmd = full_cmd.join(" ")
-    if background
-      ShellCmd.new(full_cmd, "KubectlClient.exec", force_output)
-    else
-      ShellCmd.run(full_cmd, "KubectlClient.exec", force_output)
-    end
+    return full_cmd
   end
 
   def self.cp(command)
