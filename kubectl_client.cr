@@ -148,6 +148,11 @@ module KubectlClient
       undo(kind: "deployment", resource_name: resource_name, namespace: namespace)
     end
 
+    # DEPRECATED: Added only for smooth transition from bug/1726 to main branch
+    def self.resource_status(kind : String, resource_name : String, namespace : String | Nil = nil, timeout : String = "30s") : Bool
+      status(kind: kind, resource_name: resource_name, namespace: namespace, timeout: timeout)
+    end
+
     def self.status(kind : String, resource_name : String, namespace : String | Nil = nil, timeout : String = "30s") : Bool
       cmd = "kubectl rollout status #{kind}/#{resource_name} --timeout=#{timeout}"
       if namespace
