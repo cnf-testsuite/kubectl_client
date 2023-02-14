@@ -136,6 +136,18 @@ module KubectlClient
   end
 
   module Rollout
+    # DEPRECATED: Added only for smooth transition from bug/1726 to main branch
+    def self.status(resource_name : String, namespace : String | Nil = nil, timeout : String = "30s") : Bool
+      Log.info { "Decrecated method. Pass kind in the args KubectlClient::Rollout.status(kind, resource_name, namespace, timeout)" }
+      status(kind: "deployment", resource_name: resource_name, namespace: namespace, timeout: timeout)
+    end
+
+    # DEPRECATED: Added only for smooth transition from bug/1726 to main branch
+    def self.undo(resource_name : String, namespace : String | Nil = nil) : Bool
+      Log.info { "Decrecated method. Pass kind in the args KubectlClient::Rollout.undo(kind, resource_name, namespace)" }
+      undo(kind: "deployment", resource_name: resource_name, namespace: namespace)
+    end
+
     def self.status(kind : String, resource_name : String, namespace : String | Nil = nil, timeout : String = "30s") : Bool
       cmd = "kubectl rollout status #{kind}/#{resource_name} --timeout=#{timeout}"
       if namespace
