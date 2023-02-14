@@ -42,7 +42,7 @@ module KubectlClient
 
     def self.new(cmd, log_prefix, force_output=false)
       Log.info { "#{log_prefix} command: #{cmd}" }
-      status = Process.new(
+      process = Process.new(
         cmd,
         shell: true,
         output: output = IO::Memory.new,
@@ -58,7 +58,7 @@ module KubectlClient
       if stderr.to_s.size > 1
         Log.info { "#{log_prefix} stderr: #{stderr.to_s}" }
       end
-      {status: status, output: output.to_s, error: stderr.to_s}
+      {process: process, output: output.to_s, error: stderr.to_s}
     end
   end
 
@@ -346,7 +346,6 @@ module KubectlClient
 
     # DEPRECATED: Added only for smooth transition from bug/1726 to main branch
     def self.image(
-      resource_kind : String,
       resource_name : String,
       container_name : String,
       image_name : String,
