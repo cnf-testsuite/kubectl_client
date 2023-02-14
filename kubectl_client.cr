@@ -343,6 +343,25 @@ module KubectlClient
       result = ShellCmd.run(cmd, "KubectlClient::Set.image")
       result[:status].success?
     end
+
+    # DEPRECATED: Added only for smooth transition from bug/1726 to main branch
+    def self.image(
+      resource_kind : String,
+      resource_name : String,
+      container_name : String,
+      image_name : String,
+      version_tag : String | Nil = nil,
+      namespace : String | Nil = nil
+    ) : Bool
+      return image(
+        resource_kind: "deployment",
+        resource_name: resource_name,
+        container_name: container_name,
+        image_name: image_name,
+        version_tag: version_tag,
+        namespace: namespace
+      )
+    end
   end
 
   #TODO move this out into its own file
