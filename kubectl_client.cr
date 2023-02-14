@@ -352,7 +352,7 @@ module KubectlClient
     # DEPRECATED: Added only for smooth transition from bug/1726 to main branch
     def self.image(
       resource_name : String,
-      container_name : String,
+      container_name : JSON::Any,
       image_name : String,
       version_tag : String | Nil = nil,
       namespace : String | Nil = nil
@@ -360,7 +360,7 @@ module KubectlClient
       return image(
         resource_kind: "deployment",
         resource_name: resource_name,
-        container_name: container_name,
+        container_name: container_name.as_s,
         image_name: image_name,
         version_tag: version_tag,
         namespace: namespace
