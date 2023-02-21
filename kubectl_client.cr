@@ -493,7 +493,7 @@ module KubectlClient
     end
 
     def self.schedulable_nodes_list : Array(JSON::Any)
-      retry_limit = 50
+      retry_limit = 20
       retries = 1
       empty_json_any = [] of JSON::Any
       nodes = empty_json_any
@@ -510,6 +510,8 @@ module KubectlClient
             true
           end
         end
+        sleep 1
+        retries = retries + 1
       end
       if nodes == empty_json_any
         Log.error { "nodes empty: #{nodes}" }
