@@ -212,5 +212,18 @@ describe "KubectlClient" do
     KubectlClient::Delete.file("./spec/fixtures/coredns_manifest.yml")
     KubectlClient::Delete.file("./spec/fixtures/dockerd_manifest.yml")
   end
+
+  it "'#KubectlClient.pods_by_resource' should return pods for a deployment ", tags: ["kubectl-status"]  do
+    cnf="./sample-cnfs/sample-coredns-cnf"
+    KubectlClient::Apply.file("./spec/fixtures/coredns_manifest.yml")
+    KubectlClient::Get.resource_wait_for_install("Pod", "coredns")
+
+    resource = KubectlClient::Get.resource("Deployment", "coredns-coredns")
+    resp = KubectlClient::Get.pods_by_resource(resource)
+    Log.info { resp }
+    (resp && !resp.empty?).should be_true
+  ensure
+    KubectlClient::Delete.file("./spec/fixtures/coredns_manifest.yml")
+  end
 end
 
