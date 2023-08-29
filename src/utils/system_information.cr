@@ -84,6 +84,7 @@ end
 def kubectl_global_response(verbose = false)
   status = Process.run("kubectl version", shell: true, output: kubectl_response = IO::Memory.new, error: stderr = IO::Memory.new)
   Log.for("verbose").info { kubectl_response } if verbose
+  puts "kubectl-global-response-debug: #{kubectl_response.to_s}"
   kubectl_response.to_s
 end
 
@@ -92,6 +93,7 @@ def kubectl_local_response(verbose = false)
   Log.for("verbose").info { current_dir } if verbose
   status = Process.run("#{local_kubectl_path} version", shell: true, output: kubectl_response = IO::Memory.new, error: stderr = IO::Memory.new)
   Log.for("verbose").info { kubectl_response.to_s } if verbose
+  puts "kubectl-local-response-debug: #{kubectl_response.to_s}"
   kubectl_response.to_s
 end
 
