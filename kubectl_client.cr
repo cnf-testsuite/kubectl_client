@@ -1291,6 +1291,8 @@ module KubectlClient
       Log.debug { "resource_labels kind: #{kind} resource_name: #{resource_name}" }
       if kind.downcase == "service"
         resp = resource(kind, resource_name, namespace: namespace).dig?("spec", "selector")
+      elsif kind.downcase == "deployment" 
+        resp = resource(kind, resource_name, namespace: namespace).dig?("spec", "selector", "matchLabels")
       else
         resp = resource(kind, resource_name, namespace: namespace).dig?("spec", "template", "metadata", "labels")
       end
