@@ -107,8 +107,21 @@ end
 def kubectl_version(kubectl_response, version_for = "client", verbose = false)
   version_info_json = kubectl_response
 
+  # The version skew or the server connection warnings are mutually exclusive.
+  # Only one of them may be present in the output.
+
   # Strip the server connection warning if it exists in the output.
+  # Server connection warning looks like below:
+  # The connection to the server localhost:8080 was refused - did you specify the right host or port?
   if kubectl_response.includes?("The connection to the server")
+    version_info_lines = version_info_json.split("\n")
+    version_info_json = version_info_lines[0, version_info_lines.size - 1].join("\n")
+  end
+
+  # Strip the version skew warning if it exists in the output.
+  # Version skew warning looks like below:
+  # WARNING: version difference between client (1.28) and server (1.25) exceeds the supported minor version skew of +/-1
+  if kubectl_response.includes?("WARNING: version difference between client")
     version_info_lines = version_info_json.split("\n")
     version_info_json = version_info_lines[0, version_info_lines.size - 1].join("\n")
   end
