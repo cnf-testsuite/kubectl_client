@@ -82,15 +82,13 @@ def kubectl_installation(verbose = false, offline_mode = false)
 end
 
 def kubectl_global_response(verbose = false)
-  status = Process.run("kubectl version", shell: true, output: kubectl_response = IO::Memory.new, error: stderr = IO::Memory.new)
+  status = Process.run("kubectl version -o json", shell: true, output: kubectl_response = IO::Memory.new, error: stderr = IO::Memory.new)
   Log.for("verbose").info { kubectl_response } if verbose
   kubectl_response.to_s
 end
 
 def kubectl_local_response(verbose = false)
-  current_dir = FileUtils.pwd
-  Log.for("verbose").info { current_dir } if verbose
-  status = Process.run("#{local_kubectl_path} version", shell: true, output: kubectl_response = IO::Memory.new, error: stderr = IO::Memory.new)
+  status = Process.run("#{local_kubectl_path} version -o json", shell: true, output: kubectl_response = IO::Memory.new, error: stderr = IO::Memory.new)
   Log.for("verbose").info { kubectl_response.to_s } if verbose
   kubectl_response.to_s
 end
@@ -105,26 +103,60 @@ end
 # version # => "1.12"
 # ```
 #
-# For reference, below are example client and server version strings from "kubectl version" output
-#
-# ```
-# Client Version: version.Info{Major:"1", Minor:"21", GitVersion:"v1.21.0", GitCommit:"cb303e613a121a29364f75cc67d3d580833a7479", GitTreeState:"clean", BuildDate:"2021-04-08T16:31:21Z", GoVersion:"go1.16.1", Compiler:"gc", Platform:"linux/amd64"}
-# Server Version: version.Info{Major:"1", Minor:"20", GitVersion:"v1.20.2", GitCommit:"faecb196815e248d3ecfb03c680a4507229c2a56", GitTreeState:"clean", BuildDate:"2021-01-21T01:11:42Z", GoVersion:"go1.15.5", Compiler:"gc", Platform:"linux/amd64"}
-# ```
-#
-# TODO Function could be updated to rely on the JSON output of "kubectl version -o json" instead of regex parsing
-#
 # Returns the version as a string (Example: 1.12, 1.20, etc)
 def kubectl_version(kubectl_response, version_for = "client", verbose = false)
-  # version_for can be "client" or "server"
-  resp = kubectl_response.match /#{version_for.capitalize} Version: version.Info{(Major:"(([0-9]{1,3})"\, )Minor:"([0-9]{1,3}[+]?)")/
-  Log.for("verbose").info { resp } if verbose
+  version_info_json = kubectl_response
 
-  if resp
-    "#{resp && resp.not_nil![3]}.#{resp && resp.not_nil![4]}"
-  else
-    ""
+  # The version skew or the server connection warnings are mutually exclusive.
+  # Only one of them may be present in the output.
+
+  # Strip the server connection warning if it exists in the output.
+  # Server connection warning looks like below:
+  # The connection to the server localhost:8080 was refused - did you specify the right host or port?
+  if kubectl_response.includes?("The connection to the server")
+    version_info_lines = version_info_json.split("\n")
+    version_info_json = version_info_lines[0, version_info_lines.size - 1].join("\n")
   end
+
+  # Strip the version skew warning if it exists in the output.
+  # Version skew warning looks like below:
+  # WARNING: version difference between client (1.28) and server (1.25) exceeds the supported minor version skew of +/-1
+  if kubectl_response.includes?("WARNING: version difference between client")
+    version_info_lines = version_info_json.split("\n")
+    version_info_json = version_info_lines[0, version_info_lines.size - 1].join("\n")
+  end
+
+  # Look for the appropriate key depending on client or server version lookup
+  version_key = "clientVersion"
+  if version_for == "server"
+    version_key = "serverVersion"
+  end
+
+  # Attempt to parse version output
+  # Or return blank string if json parse exception
+  begin
+    version_data = JSON.parse(version_info_json)
+  rescue ex : JSON::ParseException
+    return ""
+  end
+
+  # If the specific server/client version info does not exist,
+  # then return blank string
+  if version_data.as_h.has_key?(version_key)
+    version_info = version_data[version_key]
+  else
+    return ""
+  end
+
+  # If major and minor keys do not exist, then return blank string
+  if version_info.as_h.has_key?("major") && version_info.as_h.has_key?("minor")
+    major_version = version_info["major"].as_s
+    minor_version = version_info["minor"].as_s
+  else
+    return ""
+  end
+
+  "#{major_version}.#{minor_version}"
 end
 
 # Check if client version is not too many versions behind server version
