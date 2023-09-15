@@ -1131,7 +1131,8 @@ module KubectlClient
       replicas_applicable = false
       case kind.downcase
       when "deployment", "statefulset", "replicaset"
-        replicas_applicable = true
+        # Check if the desired replicas is equal to the ready replicas.
+        # Return true if yes.
         describe = Totem.from_yaml(resp)
         Log.info { "desired_is_available describe: #{describe.inspect}" }
         desired_replicas = describe.get("status").as_h["replicas"].as_i
@@ -1143,13 +1144,24 @@ module KubectlClient
           ready_replicas = 0
         end
         Log.info { "desired_is_available ready_replicas: #{ready_replicas}" }
+        return desired_replicas == ready_replicas
+      when "pod"
+        # Check if the pod status is ready.
+        # Return true if yes.
+        pod_info = Totem.from_yaml(resp)
+        pod_status_conditions = pod_info["status"]["conditions"]
+        ready_condition = pod_status_conditions.as_a.find do |condition_info|
+          condition_info["type"].as_s? == "Ready" && condition_info["status"].as_s? == "True"
+        end
+
+        if ready_condition
+          return true
+        end
+        return false
       else
-        replicas_applicable = false
-      end
-      if replicas_applicable
-        desired_replicas == ready_replicas
-      else
-        true
+        # If not any of the above resources,
+        # then assume resource is available.
+        return true
       end
     end
 
