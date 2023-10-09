@@ -1,5 +1,5 @@
 name: kubectl_client
-version: 1.0.3
+version: 1.0.4
 
 authors:
   - William Harris <wharris@upscalews.com>
