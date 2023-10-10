@@ -325,6 +325,13 @@ module KubectlClient
     end
   end
 
+  module Uncordon
+    def self.command(command)
+      cmd = "kubectl uncordon #{command}"
+      ShellCmd.run(cmd, "KubectlClient::Uncordon.command")
+    end
+  end
+
   module Set
     def self.image(
       resource_kind : String,
