@@ -12,7 +12,8 @@ module KubectlClient
                         pod: "Pod",
                         replicaset: "ReplicaSet",
                         statefulset: "StatefulSet",
-                        daemonset: "DaemonSet"}
+                        daemonset: "DaemonSet",
+                        service_account: "ServiceAccount"}
 
   # https://www.capitalone.com/tech/cloud/container-runtime/
   # todo add podman
