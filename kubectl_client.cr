@@ -1309,9 +1309,10 @@ module KubectlClient
 
     def self.resource_spec_labels(kind : String, resource_name : String, namespace : String | Nil = nil) : JSON::Any
       Log.debug { "resource_labels kind: #{kind} resource_name: #{resource_name}" }
-      if kind.downcase == "service"
+      case kind.downcase
+      when "service"
         resp = resource(kind, resource_name, namespace: namespace).dig?("spec", "selector")
-      elsif kind.downcase == "deployment" 
+      when "deployment", "statefulset", "replicaset", "daemonset", "job"
         resp = resource(kind, resource_name, namespace: namespace).dig?("spec", "selector", "matchLabels")
       else
         resp = resource(kind, resource_name, namespace: namespace).dig?("spec", "template", "metadata", "labels")
