@@ -2,50 +2,48 @@ module KubectlClient
   module Rollout
     @logger : ::Log = Log.for("rollout")
 
-    def self.status(kind : String, resource_name : String,
-                    namespace : String? = nil, timeout : String = "30s") : CMDResult
+    def self.status(kind : String, resource_name : String, namespace : String? = nil, timeout : String = "30s")
       logger = @logger.for("status")
       cmd = "kubectl rollout status #{kind}/#{resource_name} --timeout=#{timeout}"
       cmd = "#{cmd} -n #{namespace}" if namespace
 
-      ShellCMD.run(cmd, logger)
+      ShellCMD.raise_exc_on_error &.ShellCMD.run(cmd, logger)
     end
 
-    def self.undo(kind : String, resource_name : String, namespace : String? = nil) : CMDResult
+    def self.undo(kind : String, resource_name : String, namespace : String? = nil)
       logger = @logger.for("undo")
       cmd = "kubectl rollout undo #{kind}/#{resource_name}"
       cmd = "#{cmd} -n #{namespace}" if namespace
 
-      ShellCMD.run(cmd, logger)
+      ShellCMD.raise_exc_on_error &.ShellCMD.run(cmd, logger)
     end
   end
 
   module Apply
     @logger : ::Log = Log.for("apply")
 
-    def self.resource(kind : String, resource_name : String,
-                      namespace : String? = nil, values : String? = nil) : CMDResult
+    def self.resource(kind : String, resource_name : String, namespace : String? = nil, values : String? = nil)
       logger = @logger.for("resource")
       cmd = "kubectl create #{kind}/#{resource_name}"
       cmd = "#{cmd} -n #{namespace}" if namespace
       cmd = "#{cmd} #{values}" if values
 
-      ShellCMD.run(cmd, logger)
+      ShellCMD.raise_exc_on_error &.ShellCMD.run(cmd, logger)
     end
 
-    def self.file(file_name : String?, namespace : String? = nil) : CMDResult
+    def self.file(file_name : String?, namespace : String? = nil)
       logger = @logger.for("file")
       cmd = "kubectl apply -f #{file_name}"
       cmd = "#{cmd} -n #{namespace}" if namespace
 
-      ShellCMD.run(cmd, logger)
+      ShellCMD.raise_exc_on_error &.ShellCMD.run(cmd, logger)
     end
 
-    def self.namespace(name : String, kubeconfig : String? = nil) : CMDResult
+    def self.namespace(name : String, kubeconfig : String? = nil)
       logger = @logger.for("namespace")
       cmd = "kubectl create namespace #{name}"
 
-      ShellCMD.run(cmd, logger)
+      ShellCMD.raise_exc_on_error &.ShellCMD.run(cmd, logger)
     end
   end
 
@@ -53,7 +51,7 @@ module KubectlClient
     @logger : ::Log = Log.for("delete")
 
     def self.resource(kind : String, resource_name : String, namespace : String? = nil,
-                      labels : Hash(String, String)? = {} of String => String) : CMDResult
+                      labels : Hash(String, String)? = {} of String => String)
       logger = @logger.for("resource")
       cmd = "kubectl delete #{kind}/#{resource_name}"
       cmd = "#{cmd} -n #{namespace}" if namespace
@@ -62,10 +60,10 @@ module KubectlClient
         cmd = "#{cmd} #{label_options}"
       end
 
-      ShellCMD.run(cmd, logger)
+      ShellCMD.raise_exc_on_error &.ShellCMD.run(cmd, logger)
     end
 
-    def self.file(file_name : String?, namespace : String? = nil, wait : Bool = false) : CMDResult
+    def self.file(file_name : String?, namespace : String? = nil, wait : Bool = false)
       logger = @logger.for("file")
       cmd = "kubectl delete -f #{file_name}"
       cmd = "#{cmd} -n #{namespace}" if namespace
@@ -74,7 +72,7 @@ module KubectlClient
         logger.info { "Waiting until requested resource is deleted" }
       end
 
-      ShellCMD.run(cmd, logger)
+      ShellCMD.raise_exc_on_error &.ShellCMD.run(cmd, logger)
     end
   end
 
@@ -94,7 +92,7 @@ module KubectlClient
     #    to lookup resources belonging to a CNF to wait for uninstall.
     #    We only use this helper in the spec tests, so we use the "kubectl get" output to keep things simple.
     #
-    def self.wait_for_terminations(namespace : String? = nil, wait_count : Int32 = 30)
+    def self.wait_for_terminations(namespace : String? = nil, wait_count : Int32 = 30) : Bool
       logger = @logger.for("wait_for_terminations")
       cmd = "kubectl get all"
       # Check all namespaces by default
@@ -104,112 +102,108 @@ module KubectlClient
       found_terminating = true
       second_count = 0
       while (found_terminating && second_count < wait_count)
-        result = ShellCMD.run(cmd, logger)
+        ShellCMD.raise_exc_on_error &.result = ShellCMD.run(cmd, logger)
         if result[:output].match(/([\s+]Terminating)/)
           found_terminating = true
           second_count = second_count + 1
           sleep(1)
         else
           found_terminating = false
+          return true
         end
 
         if second_count % RESOURCE_WAIT_LOG_INTERVAL == 0
           logger.info { "Waiting until resources are terminated, seconds elapsed: #{second_count}" }
         end
       end
+      return false
     end
 
-    def self.wait_for_condition(kind : String, resource_name : String,
-                                condition : String, namespace : String? = nil) : CMDResult
+    def self.wait_for_condition(kind : String, resource_name : String, condition : String, namespace : String? = nil)
       logger = @logger.for("wait_for_condition")
       cmd = "kubectl wait #{kind}/#{resource_name} --for=#{condition}"
       cmd = "#{cmd} -n #{namespace}" if namespace
 
-      ShellCMD.run(cmd, logger)
+      ShellCMD.raise_exc_on_error &.ShellCMD.run(cmd, logger)
     end
 
-    def self.logs(pod_name : String, container_name : String? = nil,
-                  namespace : String? = nil, options : String? = nil) : CMDResult
+    def self.logs(pod_name : String, container_name : String? = nil, namespace : String? = nil, options : String? = nil)
       logger = @logger.for("logs")
       cmd = "kubectl logs"
       cmd = "#{cmd} -n #{namespace}" if namespace
       cmd = "#{cmd} -c #{container_name}" if container_name
       cmd = "#{cmd} #{options}" if options
 
-      ShellCMD.run(cmd, logger)
+      ShellCMD.raise_exc_on_error &.ShellCMD.run(cmd, logger)
     end
 
-    def self.exec(pod_name : String, command : String,
-                  container_name : String? = nil, namespace : String? = nil) : CMDResult
+    def self.exec(pod_name : String, command : String, container_name : String? = nil, namespace : String? = nil)
       logger = @logger.for("exec")
       cmd = "kubectl exec #{pod_name}"
       cmd = "#{cmd} -n #{namespace}" if namespace
       cmd = "#{cmd} -c #{container_name}" if container_name
       cmd = "-- #{command}"
 
-      ShellCMD.run(full_cmd, logger)
+      ShellCMD.raise_exc_on_error &.ShellCMD.run(cmd, logger)
     end
 
-    def self.exec_bg(pod_name : String, command : String,
-                     container_name : String? = nil, namespace : String? = nil) : CMDResult
+    def self.exec_bg(pod_name : String, command : String, container_name : String? = nil, namespace : String? = nil)
       logger = @logger.for("exec_bg")
       cmd = "kubectl exec #{pod_name}"
       cmd = "#{cmd} -n #{namespace}" if namespace
       cmd = "#{cmd} -c #{container_name}" if container_name
       cmd = "-- #{command}"
 
-      ShellCMD.new(full_cmd, logger)
+      ShellCMD.raise_exc_on_error &.ShellCMD.new(cmd, logger)
     end
 
     def self.copy_to_pod(pod_name : String, source : String, destination : String,
-                         container_name : String? = nil, namespace : String? = nil) : CMDResult
+                         container_name : String? = nil, namespace : String? = nil)
       logger = @logger.for("copy_to_pod")
       cmd = "kubectl cp"
       cmd = "#{cmd} -n #{namespace}" if namespace
       cmd = "#{cmd} #{source} #{pod_name}:#{destination}"
       cmd = "#{cmd} -c #{container_name}" if container_name
 
-      ShellCMD.run(full_cmd, logger)
+      ShellCMD.raise_exc_on_error &.ShellCMD.run(cmd, logger)
     end
 
     def self.copy_from_pod(pod_name : String, source : String, destination : String,
-                           container_name : String? = nil, namespace : String? = nil) : CMDResult
+                           container_name : String? = nil, namespace : String? = nil)
       logger = @logger.for("copy_from_pod")
       cmd = "kubectl cp"
       cmd = "#{cmd} -n #{namespace}" if namespace
       cmd = "#{cmd} #{pod_name}:#{source} #{destination}"
       cmd = "#{cmd} -c #{container_name}" if container_name
 
-      ShellCMD.run(full_cmd, logger)
+      ShellCMD.raise_exc_on_error &.ShellCMD.run(cmd, logger)
     end
 
-    def self.scale(kind : String, resource_name : String, replicas : Int32, namespace : String? = nil) : CMDResult
+    def self.scale(kind : String, resource_name : String, replicas : Int32, namespace : String? = nil)
       logger = @logger.for("scale")
       cmd = "kubectl scale #{kind}/#{resource_name} --replicas=#{replicas}"
       cmd = "#{cmd} -n #{namespace}" if namespace
 
-      ShellCMD.run(full_cmd, logger)
+      ShellCMD.raise_exc_on_error &.ShellCMD.run(cmd, logger)
     end
 
-    def self.replace_raw(path : String, file_path : String, extra_flags : String? = nil) : CMDResult
+    def self.replace_raw(path : String, file_path : String, extra_flags : String? = nil)
       logger = @logger.for("replace_raw")
       cmd = "kubectl replace --raw '#{path}' -f #{file_path}"
       cmd = "#{cmd} #{extra_flags}" if extra_flags
 
-      ShellCMD.run(cmd, logger)
+      ShellCMD.raise_exc_on_error &.ShellCMD.run(cmd, logger)
     end
 
-    def self.annotate(kind : String, resource_name : String,
-                      annotatation_str : String, namespace : String? = nil) : CMDResult
+    def self.annotate(kind : String, resource_name : String, annotatation_str : String, namespace : String? = nil)
       logger = @logger.for("annotate")
       cmd = "kubectl annotate #{kind}/#{resource_name} --overwrite #{annotatation_str}"
       cmd = "#{cmd} -n #{namespace}" if namespace
 
-      ShellCMD.run(cmd, logger)
+      ShellCMD.raise_exc_on_error &.ShellCMD.run(cmd, logger)
     end
 
-    def self.label(kind : String, resource_name : String,
-                   labels : Array(String), namespace : String? = nil) : CMDResult
+    def self.label(kind : String, resource_name : String, labels : Array(String), namespace : String? = nil)
       logger = @logger.for("label")
       cmd = "kubectl label --overwrite #{kind}/#{resource_name}"
       cmd = "#{cmd} -n #{namespace}" if namespace
@@ -218,21 +212,21 @@ module KubectlClient
         cmd = "#{cmd} #{label}"
       end
 
-      ShellCMD.run(cmd, logger)
+      ShellCMD.raise_exc_on_error &.ShellCMD.run(cmd, logger)
     end
 
-    def self.cordon(node_name : String) : CMDResult
+    def self.cordon(node_name : String)
       logger = @logger.for("cordon")
       cmd = "kubectl cordon #{node_name}"
 
-      ShellCMD.run(cmd, logger)
+      ShellCMD.raise_exc_on_error &.ShellCMD.run(cmd, logger)
     end
 
-    def self.uncordon(node_name : String) : CMDResult
+    def self.uncordon(node_name : String)
       logger = @logger.for("uncordon")
       cmd = "kubectl uncordon #{node_name}"
 
-      ShellCMD.run(cmd, logger)
+      ShellCMD.raise_exc_on_error &.ShellCMD.run(cmd, logger)
     end
 
     def self.set_image(
@@ -242,13 +236,15 @@ module KubectlClient
       image_name : String,
       version_tag : String? = nil,
       namespace : String? = nil
-    ) : CMDResult
+    )
       logger = @logger.for("set_image")
 
-      cmd = version_tag ? "kubectl set image #{resource_kind}/#{resource_name}#{container_name}=#{image_name}:#{version_tag} --record" : "kubectl set image #{resource_kind}/#{resource_name} #{container_name}=#{image_name} --record"
+      cmd = version_tag ?
+        "kubectl set image #{resource_kind}/#{resource_name}#{container_name}=#{image_name}:#{version_tag} --record" :
+        "kubectl set image #{resource_kind}/#{resource_name} #{container_name}=#{image_name} --record"
       cmd = "#{cmd} -n #{namespace}" if namespace
 
-      ShellCMD.run(cmd, logger)
+      ShellCMD.raise_exc_on_error &.ShellCMD.run(cmd, logger)
     end
   end
 end

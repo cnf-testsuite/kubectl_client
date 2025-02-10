@@ -68,6 +68,17 @@ module KubectlClient
 
       BackgroundCMDResult.new(process: process, output: output.to_s, error: stderr.to_s)
     end
+
+    def raise_exc_on_error(&)
+      result = yield
+      # TODO: raise different kind of exceptions based on type of error (network issue, resource does not exits etc.)
+      unless result[:status].success?
+        raise K8sClientCMDException.new(result[:error])
+      end
+    end
+
+    class K8sClientCMDException < Exception
+    end
   end
 
   def self.installation_found?(verbose = false, offline_mode = false) : Bool
