@@ -208,6 +208,19 @@ module KubectlClient
       ShellCMD.run(cmd, logger)
     end
 
+    def self.label(kind : String, resource_name : String,
+                   labels : Array(String), namespace : String? = nil) : CMDResult
+      logger = @logger.for("label")
+      cmd = "kubectl label --overwrite #{kind}/#{resource_name}"
+      cmd = "#{cmd} -n #{namespace}" if namespace
+
+      labels.each do |label|
+        cmd = "#{cmd} #{label}"
+      end
+
+      ShellCMD.run(cmd, logger)
+    end
+
     def self.cordon(node_name : String) : CMDResult
       logger = @logger.for("cordon")
       cmd = "kubectl cordon #{node_name}"
@@ -232,9 +245,7 @@ module KubectlClient
     ) : CMDResult
       logger = @logger.for("set_image")
 
-      cmd = version_tag ?
-        "kubectl set image #{resource_kind}/#{resource_name}#{container_name}=#{image_name}:#{version_tag} --record" :
-        "kubectl set image #{resource_kind}/#{resource_name} #{container_name}=#{image_name} --record"
+      cmd = version_tag ? "kubectl set image #{resource_kind}/#{resource_name}#{container_name}=#{image_name}:#{version_tag} --record" : "kubectl set image #{resource_kind}/#{resource_name} #{container_name}=#{image_name} --record"
       cmd = "#{cmd} -n #{namespace}" if namespace
 
       ShellCMD.run(cmd, logger)
