@@ -8,8 +8,6 @@ require "./src/utils/system_information.cr"
 module KubectlClient
   Log = ::Log.for("k8s-client")
 
-  alias K8sManifest = JSON::Any
-  alias K8sManifestList = Array(JSON::Any)
   alias CMDResult = NamedTuple(status: Process::Status, stdout: String, stderr: String)
   alias BackgroundCMDResult = NamedTuple(process: Process, stdout: String, stderr: String)
 
@@ -74,6 +72,14 @@ module KubectlClient
       # TODO: raise different kind of exceptions based on type of error (network issue, resource does not exits etc.)
       unless result[:status].success?
         raise K8sClientCMDException.new(result[:error])
+      end
+    end
+
+    def parse_get_result(result : CMDResult)
+      if result[:status].success? && !result[:output].empty?
+        return JSON.parse(response)
+      else
+        return EMPTY_JSON
       end
     end
 

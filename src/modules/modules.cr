@@ -79,54 +79,6 @@ module KubectlClient
   module Utils
     @logger : ::Log = Log.for("utils")
 
-    # Using sleep() to wait for terminating resources is unreliable.
-    #
-    # 1. Resources still in terminating state can interfere with test runs.
-    #    and result in failures of the next test (or spec test).
-    #
-    # 2. Helm uninstall wait option and kubectl delete wait options,
-    #    do not wait for child resources to be fully deleted.
-    #
-    # 3. The output from kubectl json does not clearly indicate when a resource is in a terminating state.
-    #    To wait for uninstall, we can use the app.kubernetes.io/name label,
-    #    to lookup resources belonging to a CNF to wait for uninstall.
-    #    We only use this helper in the spec tests, so we use the "kubectl get" output to keep things simple.
-    #
-    def self.wait_for_terminations(namespace : String? = nil, wait_count : Int32 = 30) : Bool
-      logger = @logger.for("wait_for_terminations")
-      cmd = "kubectl get all"
-      # Check all namespaces by default
-      cmd = namespace ? "#{cmd} -n #{namespace}" : "#{cmd} -A"
-
-      # By default assume there is a resource still terminating.
-      found_terminating = true
-      second_count = 0
-      while (found_terminating && second_count < wait_count)
-        ShellCMD.raise_exc_on_error &.result = ShellCMD.run(cmd, logger)
-        if result[:output].match(/([\s+]Terminating)/)
-          found_terminating = true
-          second_count = second_count + 1
-          sleep(1)
-        else
-          found_terminating = false
-          return true
-        end
-
-        if second_count % RESOURCE_WAIT_LOG_INTERVAL == 0
-          logger.info { "Waiting until resources are terminated, seconds elapsed: #{second_count}" }
-        end
-      end
-      return false
-    end
-
-    def self.wait_for_condition(kind : String, resource_name : String, condition : String, namespace : String? = nil)
-      logger = @logger.for("wait_for_condition")
-      cmd = "kubectl wait #{kind}/#{resource_name} --for=#{condition}"
-      cmd = "#{cmd} -n #{namespace}" if namespace
-
-      ShellCMD.raise_exc_on_error &.ShellCMD.run(cmd, logger)
-    end
-
     def self.logs(pod_name : String, container_name : String? = nil, namespace : String? = nil, options : String? = nil)
       logger = @logger.for("logs")
       cmd = "kubectl logs"
@@ -239,9 +191,7 @@ module KubectlClient
     )
       logger = @logger.for("set_image")
 
-      cmd = version_tag ?
-        "kubectl set image #{resource_kind}/#{resource_name}#{container_name}=#{image_name}:#{version_tag} --record" :
-        "kubectl set image #{resource_kind}/#{resource_name} #{container_name}=#{image_name} --record"
+      cmd = version_tag ? "kubectl set image #{resource_kind}/#{resource_name}#{container_name}=#{image_name}:#{version_tag} --record" : "kubectl set image #{resource_kind}/#{resource_name} #{container_name}=#{image_name} --record"
       cmd = "#{cmd} -n #{namespace}" if namespace
 
       ShellCMD.raise_exc_on_error &.ShellCMD.run(cmd, logger)
