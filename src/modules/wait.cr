@@ -13,10 +13,10 @@ module KubectlClient
   #    We only use this helper in the spec tests, so we use the "kubectl get" output to keep things simple.
   #
   module Wait
-    @logger : ::Log = Log.for("wait")
+    @@logger : ::Log = Log.for("wait")
 
     def self.wait_for_terminations(namespace : String? = nil, wait_count : Int32 = 30) : Bool
-      logger = @logger.for("wait_for_terminations")
+      logger = @@logger.for("wait_for_terminations")
       cmd = "kubectl get all"
       # Check all namespaces by default
       cmd = namespace ? "#{cmd} -n #{namespace}" : "#{cmd} -A"
@@ -24,7 +24,7 @@ module KubectlClient
       # By default assume there is a resource still terminating.
       found_terminating = true
       second_count = 0
-      while (found_terminating && second_count < wait_count)
+      while found_terminating && second_count < wait_count
         ShellCMD.raise_exc_on_error &.result = ShellCMD.run(cmd, logger)
         if result[:output].match(/([\s+]Terminating)/)
           found_terminating = true
@@ -39,19 +39,19 @@ module KubectlClient
           logger.info { "Waiting until resources are terminated, seconds elapsed: #{second_count}" }
         end
       end
-      return false
+      false
     end
 
     def self.wait_for_condition(kind : String, resource_name : String, condition : String, namespace : String? = nil)
-      logger = @logger.for("wait_for_condition")
+      logger = @@logger.for("wait_for_condition")
       cmd = "kubectl wait #{kind}/#{resource_name} --for=#{condition}"
       cmd = "#{cmd} -n #{namespace}" if namespace
 
-      ShellCMD.raise_exc_on_error &.ShellCMD.run(cmd, logger)
+      ShellCMD.raise_exc_on_error { ShellCMD.run(cmd, logger) }
     end
 
     private def self.resource_ready?(kind : String, resource_name : String, namespace : String? = nil) : Bool
-      logger = @logger.for("resource_ready?")
+      logger = @@logger.for("resource_ready?")
       logger.debug { "Checking if resource #{kind}/#{resource_name} is ready" }
 
       ready = false
@@ -80,8 +80,8 @@ module KubectlClient
       wait_count : Int32 = 180,
       namespace : String = "default",
     ) : Bool
-      logger = @logger.for("wait_for_resource_key_value")
-      logger.info { "Waiting for resource #{kind}/#{resource_name} to have #{dig_params.join(".")} = #{value.as_s}" }
+      logger = @@logger.for("wait_for_resource_key_value")
+      logger.info { "Waiting for resource #{kind}/#{resource_name} to have #{dig_params.join(".")} = #{value}" }
 
       # Check if resource is installed / ready to use
       case kind.downcase
@@ -109,7 +109,7 @@ module KubectlClient
       wait_count : Int32 = 180,
       namespace : String = "default",
     ) : Bool
-      logger = @logger.for("resource_wait_for_install")
+      logger = @@logger.for("resource_wait_for_install")
       logger.info { "Waiting for resource #{kind}/#{resource_name} to install" }
 
       second_count = 0
@@ -140,7 +140,7 @@ module KubectlClient
       wait_count : Int32 = 180,
       namespace : String? = "default"
     ) : Bool
-      logger = @logger.for("resource_wait_for_uninstall")
+      logger = @@logger.for("resource_wait_for_uninstall")
       logger.info { "Waiting for resource #{kind}/#{resource_name} to uninstall" }
 
       second_count = 0
@@ -157,10 +157,10 @@ module KubectlClient
 
       if resource_uninstalled == EMPTY_JSON
         logger.info { "#{kind}/#{resource_name} was uninstalled" }
-        return true
+        true
       else
         logger.warn { "#{kind}/#{resource_name} is still present" }
-        return false
+        false
       end
     end
 
@@ -168,7 +168,7 @@ module KubectlClient
                                         dig_params : Tuple,
                                         value : (String?) = nil,
                                         wait_count : Int32 = 15)
-      logger = @logger.for("wait_for_key_value")
+      logger = @@logger.for("wait_for_key_value")
 
       second_count = 0
       key_created = false
@@ -203,7 +203,7 @@ module KubectlClient
     end
 
     def self.wait_for_install_by_apply(manifest_file : String, wait_count : Int32 = 180) : Bool
-      logger = @logger.for("wait_for_install_by_apply")
+      logger = @@logger.for("wait_for_install_by_apply")
       logger.info { "Waiting for manifest found in #{manifest_file} to install" }
 
       apply_result = KubectlClient::Apply.file(manifest_file)
@@ -227,14 +227,14 @@ module KubectlClient
       end
 
       logger.warn { "Manifest #{manifest_file} was not installed - timeout" }
-      return false
+      false
     end
 
     def self.wait_for_resource_availability(kind : String,
                                             resource_name : String,
                                             namespace = "default",
                                             wait_count : Int32 = 180) : Bool
-      logger = @logger.for("wait_for_resource_availability")
+      logger = @@logger.for("wait_for_resource_availability")
       logger.info { "Waiting for #{kind}/#{resource_name} to be available" }
 
       second_count = 0

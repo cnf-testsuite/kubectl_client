@@ -8,8 +8,8 @@ require "./src/utils/system_information.cr"
 module KubectlClient
   Log = ::Log.for("k8s-client")
 
-  alias CMDResult = NamedTuple(status: Process::Status, stdout: String, stderr: String)
-  alias BackgroundCMDResult = NamedTuple(process: Process, stdout: String, stderr: String)
+  alias CMDResult = NamedTuple(status: Process::Status, output: String, error: String)
+  alias BackgroundCMDResult = NamedTuple(process: Process, output: String, error: String)
 
   WORKLOAD_RESOURCES = {deployment:      "Deployment",
                         service:         "Service",
@@ -31,17 +31,17 @@ module KubectlClient
         error: stderr = IO::Memory.new
       )
       if force_output == false
-        logger.debug { "output: #{output.to_s}" }
+        logger.debug { "output: #{output}" }
       else
-        logger.info { "output: #{output.to_s}" }
+        logger.info { "output: #{output}" }
       end
 
       # Don't have to output log line if stderr is empty
       if stderr.to_s.size > 1
-        logger.warn { "stderr: #{stderr.to_s}" }
+        logger.warn { "stderr: #{stderr}" }
       end
 
-      CMDResult.new(status: status, output: output.to_s, error: stderr.to_s)
+      {status: status, output: output.to_s, error: stderr.to_s}
     end
 
     def self.new(cmd, logger : ::Log = Log, force_output = false) : CMDResult
@@ -54,32 +54,33 @@ module KubectlClient
         error: stderr = IO::Memory.new
       )
       if force_output == false
-        logger.debug { "output: #{output.to_s}" }
+        logger.debug { "output: #{output}" }
       else
-        logger.info { "output: #{output.to_s}" }
+        logger.info { "output: #{output}" }
       end
 
       # Don't have to output log line if stderr is empty
       if stderr.to_s.size > 1
-        logger.warn { "stderr: #{stderr.to_s}" }
+        logger.warn { "stderr: #{stderr}" }
       end
 
-      BackgroundCMDResult.new(process: process, output: output.to_s, error: stderr.to_s)
+      {process: process, output: output.to_s, error: stderr.to_s}
     end
 
-    def raise_exc_on_error(&)
+    def self.raise_exc_on_error(&)
       result = yield
       # TODO: raise different kind of exceptions based on type of error (network issue, resource does not exits etc.)
       unless result[:status].success?
         raise K8sClientCMDException.new(result[:error])
       end
+      result
     end
 
-    def parse_get_result(result : CMDResult)
+    def self.parse_get_result(result : CMDResult)
       if result[:status].success? && !result[:output].empty?
-        return JSON.parse(response)
+        JSON.parse(result[:output])
       else
-        return EMPTY_JSON
+        EMPTY_JSON
       end
     end
 
