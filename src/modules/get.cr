@@ -28,7 +28,6 @@ module KubectlClient
       cmd = "#{cmd} --field-selector #{field_selector}" if field_selector
       cmd = "#{cmd} -n #{namespace}" if namespace && !all_namespaces
       cmd = "#{cmd} -A" if !namespace && all_namespaces
-      # RLTODO: ensure -o json in all methods is always at the end
       cmd = "#{cmd} -o json"
 
       result = ShellCMD.raise_exc_on_error &.ShellCMD.run(cmd, logger)
@@ -38,7 +37,8 @@ module KubectlClient
 
     def self.privileged_containers(namespace = "--all-namespaces") : JSON::Any
       logger = @logger.for("privileged_containers")
-      cmd = "kubectl get pods #{namespace} -o jsonpath='{.items[*].spec.containers[?(@.securityContext.privileged==true)].name}'"
+      cmd = "kubectl get pods #{namespace} -o " +
+            "jsonpath='{.items[*].spec.containers[?(@.securityContext.privileged==true)].name}'"
       result = ShellCMD.raise_exc_on_error &.ShellCMD.run(cmd, logger)
 
       parse_get_result(result)
@@ -92,8 +92,6 @@ module KubectlClient
       end
     end
 
-    # TODO: why is this retried at all and even if this is needed, why inside method and not by callers?
-    # why is 'nodes' method failing when its very simple call?
     def self.schedulable_nodes_list(retry_limit : Int32 = 20) : Array(JSON::Any)
       logger = @logger.for("schedulable_nodes_list")
       logger.info { "Retrieving list of schedulable nodes" }
@@ -123,8 +121,6 @@ module KubectlClient
       nodes
     end
 
-    # TODO: why is this retried at all and even if this is needed, why inside method and not by callers?
-    # why is 'nodes' method failing when its very simple call?
     def self.nodes_by_resource(resource, retry_limit = 20) : Array(JSON::Any)
       logger = @logger.for("nodes_by_resource")
       full_resource = "#{resource.dig?("kind")}/#{resource.dig?("metadata", "name")}"
@@ -152,8 +148,6 @@ module KubectlClient
       nodes
     end
 
-    # TODO: why is this retried at all and even if this is needed, why inside method and not by callers?
-    # why is 'nodes' method failing when its very simple call?
     def self.nodes_by_pod(pod, retry_limit = 3) : Array(JSON::Any)
       logger = @logger.for("nodes_by_pod")
       pod_name = "#{pod.dig?("metadata", "name")}"
@@ -241,7 +235,8 @@ module KubectlClient
         end
         match
       end
-      logger.debug { "Matched #{pods_json.size} pods: #{pods_json.map { |item| item.dig?("metadata", "name").as_s }.join(", ")}" }
+      logger.debug { "Matched #{pods_json.size} pods: " +
+        "#{pods_json.map { |item| item.dig?("metadata", "name").as_s }.join(", ")}" }
 
       pods_json
     end
@@ -298,7 +293,8 @@ module KubectlClient
           end
         end
       end
-      logger.debug { "Matched #{matched_pods.size} pods: #{matched_pods.map { |item| item.dig?("metadata", "name").as_s }.join(", ")}" }
+      logger.debug { "Matched #{matched_pods.size} pods: " +
+        "#{matched_pods.map { |item| item.dig?("metadata", "name").as_s }.join(", ")}" }
 
       matched_pod
     end
@@ -327,8 +323,9 @@ module KubectlClient
       end
     end
 
-    private def self.replica_count(kind : String, resource_name : String,
-                                   namespace : String? = nil) : NamedTuple(current: Int32, desired: Int32, unavailable: Int32)
+    private def self.replica_count(
+      kind : String, resource_name : String, namespace : String? = nil
+    ) : NamedTuple(current: Int32, desired: Int32, unavailable: Int32)
       logger = @logger.for("replica_count")
       logger.debug { "Get replica count of #{kind}/#{resource_name}" }
 
@@ -344,7 +341,7 @@ module KubectlClient
       end
       logger.trace { "replicas: current = #{current}, desired = #{desired}, unavailable = #{unavailable}" }
 
-      {current: current, desired: desired, unavailable: unavailable}
+      {current: current.as_i, desired: desired.as_i, unavailable: unavailable.as_i}
     end
 
     # TODO add a spec for this
@@ -365,15 +362,20 @@ module KubectlClient
       return all_pods.size > 0 ? true : false
     end
 
-    # RLTODO: IM HERE
-    def self.node_status(node_name)
+    def self.node_ready?(node_name : String) : Bool
+      logger = @logger.for("node_ready?")
+      logger.info { "Check if node status is: Ready" }
+
       cmd = "kubectl get nodes #{node_name} -o jsonpath='{.status.conditions[?(@.type == \"Ready\")].status}'"
-      result = ShellCMD.run(cmd, "KubectlClient::Get.node_status")
-      result[:output]
+      ShellCMD.raise_exc_on_error &.result = ShellCMD.run(cmd, logger)
+
+      return Bool.parse?(result[:output].downcase)
     end
 
     def self.resource_spec_labels(kind : String, resource_name : String, namespace : String? = nil) : JSON::Any
-      Log.debug { "resource_labels kind: #{kind} resource_name: #{resource_name}" }
+      logger = @logger.for("resource_spec_labels")
+      logger.info { "Get labels of resource #{kind}/#{resource_name}" }
+
       case kind.downcase
       when "service"
         resp = resource(kind, resource_name, namespace: namespace).dig?("spec", "selector")
@@ -382,37 +384,42 @@ module KubectlClient
       else
         resp = resource(kind, resource_name, namespace: namespace).dig?("spec", "template", "metadata", "labels")
       end
-      Log.debug { "resource_labels: #{resp}" }
-      if resp
-        resp
-      else
-        JSON.parse(%({}))
-      end
+      logger.trace { "Resource labels: #{resp}" }
+
+      return resp if resp
+      return EMPTY_JSON
     end
 
-    def self.container_image_tags(deployment_containers) : Array(NamedTuple(image: String,
-      tag: String))
-      image_tags = deployment_containers.as_a.map do |container|
-        Log.debug { "container (should have image and tag): #{container}" }
-        {image: container.as_h["image"].as_s.rpartition(":")[0],
-        # TODO an image may not have a tag
-         tag: container.as_h["image"].as_s.rpartition(":")[2]?}
+    def self.container_image_tags(containers : JSON::Any) : Array(NamedTuple(image: String, tag: String))
+      logger = @logger.for("container_image_tags")
+      logger.info { "Get image tags of containers" }
+
+      image_tags = containers.as_a.map do |container|
+        {
+          image: container.as_h["image"].as_s.rpartition(":")[0],
+          tag:   container.as_h["image"].as_s.rpartition(":")[2]?,
+        }
       end
-      Log.debug { "image_tags: #{image_tags}" }
+      logger.trace { "images and tags: #{image_tags}" }
+
       image_tags
     end
 
     def self.worker_nodes : Array(String)
-      # Full command:
-      #
-      # kubectl get nodes --selector='!node-role.kubernetes.io/master' -o 'go-template={{range .items}}{{$taints:=""}}{{range .spec.taints}}{{if eq .effect "NoSchedule"}}{{$taints = print $taints .key ","}}{{end}}{{end}}{{if not $taints}}{{.metadata.name}}{{ "\\n"}}{{end}}{{end}}'
+      logger = @logger.for("worker_nodes")
+      logger.info { "Get list of worker nodes" }
 
-      cmd = "kubectl get nodes --selector='!node-role.kubernetes.io/master' -o 'go-template=#{@@schedulable_nodes_template}'"
-      result = ShellCMD.run(cmd, "KubectlClient::Get.worker_nodes")
+      cmd = "kubectl get nodes --selector='!node-role.kubernetes.io/master' " +
+            "-o 'go-template=#{@@schedulable_nodes_template}'"
+      ShellCMD.raise_exc_on_error &.result = ShellCMD.run(cmd, logger)
+
       result[:output].split("\n")
     end
 
-    def self.pv_items_by_claim_name(claim_name)
+    def self.pv_items_by_claim_name(claim_name : String) : JSON::Any?
+      logger = @logger.for("pv_items_by_claim_name")
+      logger.info { "Get PV items by claim name: #{claim_name}" }
+
       items = pv["items"].as_a.map do |x|
         begin
           if x["spec"]["claimRef"]["name"] == claim_name
@@ -421,171 +428,25 @@ module KubectlClient
             nil
           end
         rescue ex
-          Log.info { ex.message }
+          logger.warn { "Caught exception: #{ex.message}" }
           nil
         end
       end.compact
-      Log.debug { "pv items : #{items}" }
+      logger.trace { "PV items found: #{items}" }
+
       items
     end
 
     def self.container_runtimes
+      logger = @logger.for("container_runtimes")
+      logger.info { "Get container runtimes of nodes" }
+
       runtimes = nodes["items"].as_a.map do |x|
         x["status"]["nodeInfo"]["containerRuntimeVersion"].as_s
       end
-      Log.info { "runtimes: #{runtimes}" }
+      logger.trace { "runtimes found: #{runtimes.uniq}" }
+
       runtimes.uniq
-    end
-
-    # *pod_exists* returns true if a pod containing *pod_name* exists, regardless of status.
-    # If *check_ready* is set to true, *pod_exists* validates that the pod exists and
-    # has a ready status of true
-    def self.pod_exists?(pod_name, check_ready = false, all_namespaces = false)
-      Log.debug { "pod_exists? pod_name: #{pod_name}" }
-      exists = pods(all_namespaces)["items"].as_a.any? do |x|
-        (name_comparison = x["metadata"]["name"].as_s? =~ /#{pod_name}/
-        (x["metadata"]["name"].as_s? =~ /#{pod_name}/) ||
-          (x["metadata"]["generateName"]? && x["metadata"]["generateName"].as_s? =~ /#{pod_name}/)) &&
-          (check_ready && (x["status"]["conditions"].as_a.find { |x| x["type"].as_s? == "Ready" } && x["status"].as_s? == "True") || check_ready == false)
-      end
-      Log.debug { "pod exists: #{exists}" }
-      exists
-    end
-
-    def self.all_pod_statuses
-      statuses = pods["items"].as_a.map do |x|
-        x["status"]
-      end
-      Log.debug { "pod statuses: #{statuses}" }
-      statuses
-    end
-
-    def self.all_pod_container_statuses
-      statuses = all_pod_statuses.map do |x|
-        # todo there are some pods that dont have containerStatuses
-        if x["containerStatuses"]?
-          x["containerStatuses"].as_a
-        else
-          [] of JSON::Any
-        end
-      end
-      statuses
-    end
-
-    def self.all_container_repo_digests
-      imageids = all_pod_container_statuses.reduce([] of String) do |acc, x|
-        acc | x.map { |i| i["imageID"].as_s }
-      end
-      Log.debug { "pod container image ids: #{imageids}" }
-      imageids
-    end
-
-    def self.pod_statuses_by_nodes(nodes)
-      pods = KubectlClient::Get.pods_by_nodes(nodes)
-      Log.debug { "pod_statuses_by_nodes pods_by_nodes pods: #{pods}" }
-      statuses = pods.map do |x|
-        x["status"]
-      end
-      Log.debug { "pod_statuses_by_nodes statuses: #{statuses}" }
-      statuses
-    end
-
-    def self.pod_container_statuses_by_nodes(nodes)
-      statuses = pod_statuses_by_nodes(nodes).map do |x|
-        # todo there are some pods that dont have containerStatuses
-        if x["containerStatuses"]?
-          x["containerStatuses"].as_a
-        else
-          [] of JSON::Any
-        end
-      end
-      Log.debug { "pod_container_statuses_by_nodes containerStatuses: #{statuses}" }
-      statuses
-    end
-
-    def self.container_digests_by_nodes(nodes)
-      Log.debug { "container_digests_by_nodes nodes: #{nodes}" }
-      imageids = pod_container_statuses_by_nodes(nodes).reduce([] of String) do |acc, x|
-        if x
-          acc | x.map { |i| i["imageID"].as_s }
-        else
-          acc
-        end
-      end
-      Log.info { "container_digests_by_nodes image ids: #{imageids}" }
-      imageids
-    end
-
-    def self.container_images_by_nodes(nodes)
-      Log.debug { "container_images_by_nodes nodes: #{nodes}" }
-      images = pod_container_statuses_by_nodes(nodes).reduce([] of String) do |acc, x|
-        if x
-          acc | x.map { |i| i["image"].as_s }
-        else
-          acc
-        end
-      end
-      Log.info { "container_images_by_nodes images: #{images}" }
-      images
-    end
-
-    # todo match against multiple images
-    # def self.container_tag_from_image_by_nodes(images : Array(String), nodes)
-    #   images.map{|x| container_tag_from_image_by_nodes(x, nodes)}.flatten.concat
-    # end
-    def self.container_tag_from_image_by_nodes(image, nodes)
-      Log.info { "container_tag_from_image_by_nodes image: #{image}" }
-      Log.debug { "container_tag_from_image_by_nodes nodes: #{nodes}" }
-      # TODO Remove duplicates & and support multiple?
-      all_images = container_images_by_nodes(nodes).flatten
-      Log.info { "container_tag_from_image_by_nodes all_images: #{all_images}" }
-      matched_image = all_images.select { |x| x.includes?(image) }
-      Log.info { "container_tag_from_image_by_nodes matched_image: #{matched_image}" }
-      parsed_image = DockerClient.parse_image("#{matched_image[0]}") if matched_image.size > 0
-      tags = parsed_image["tag"] if parsed_image
-      Log.info { "container_tag_from_image_by_nodes tags: #{tags}" } if tags
-      tags
-    end
-
-    def self.pods_by_digest_and_nodes(digest, nodes = KubectlClient::Get.nodes["items"].as_a)
-      Log.info { "pods_by_digest_and_nodes" }
-      digest_pods = nodes.map { |item|
-        Log.info { "items labels: #{item.dig?("metadata", "labels")}" }
-        node_name = item.dig?("metadata", "labels", "kubernetes.io/hostname")
-        Log.debug { "NodeName: #{node_name}" }
-        pods = KubectlClient::Get.pods.as_h["items"].as_a.select do |pod|
-          found = false
-          # todo add another pod comparison for sha hash
-          if pod["status"]["containerStatuses"]?
-            found = pod["status"]["containerStatuses"].as_a.any? do |container_status|
-              Log.debug { "container_status imageid: #{container_status["imageID"]}" }
-              Log.debug { "pods_by_digest_and_nodes digest: #{digest}" }
-              match_found = container_status["imageID"].as_s.includes?("#{digest}")
-              Log.debug { "container_status match_found: #{match_found}" }
-              match_found
-            end
-            Log.debug { "found pod: #{pod}" }
-            pod_name = pod.dig?("metadata", "name")
-            Log.debug { "found PodName: #{pod_name}" }
-            if found && pod.dig?("spec", "nodeName") == "#{node_name}"
-              Log.debug { "found pod and node: #{pod} #{node_name}" }
-              true
-            else
-              Log.debug { "spec node_name: No Match: #{node_name}" }
-              false
-            end
-          else
-            Log.info { "no containerstatuses" }
-            false
-          end
-        end
-      }.flatten
-      if digest_pods.empty?
-        Log.info { "match not found for digest: #{digest}" }
-        [EMPTY_JSON]
-      else
-        digest_pods
-      end
     end
   end
 end
