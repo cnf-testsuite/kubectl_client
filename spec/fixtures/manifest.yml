@@ -12,29 +12,29 @@ data:
 apiVersion: v1
 kind: Pod
 metadata:
-    name: dockerd
-    labels:
-      name: dockerd 
+  name: dockerd
+  labels:
+    name: dockerd-test-label
 spec:
   containers:
-  - name: dockerd
-    image: docker:dind
-    volumeMounts:
-    - name: config-volume
-      mountPath: /etc/docker/daemon.json
-      subPath: config.yaml
-    livenessProbe:
-      tcpSocket:
-        port: 2376
-      initialDelaySeconds: 3
-      periodSeconds: 3
-    readinessProbe:
-      tcpSocket:
-        port: 2376
-      initialDelaySeconds: 3
-      periodSeconds: 3
-    securityContext:
-      privileged: true
+    - name: dockerd
+      image: docker:dind
+      volumeMounts:
+        - name: config-volume
+          mountPath: /etc/docker/daemon.json
+          subPath: config.yaml
+      livenessProbe:
+        tcpSocket:
+          port: 2376
+        initialDelaySeconds: 3
+        periodSeconds: 3
+      readinessProbe:
+        tcpSocket:
+          port: 2376
+        initialDelaySeconds: 3
+        periodSeconds: 3
+      securityContext:
+        privileged: true
   volumes:
     - name: config-volume
       configMap:

@@ -30,8 +30,8 @@ module KubectlClient
         output: output = IO::Memory.new,
         error: stderr = IO::Memory.new
       )
-      if force_output == false
-        logger.debug { "output: #{output}" }
+      if !force_output
+        logger.trace { "output: #{output}" }
       else
         logger.info { "output: #{output}" }
       end
@@ -53,8 +53,8 @@ module KubectlClient
         output: output = IO::Memory.new,
         error: stderr = IO::Memory.new
       )
-      if force_output == false
-        logger.debug { "output: #{output}" }
+      if !force_output
+        logger.trace { "output: #{output}" }
       else
         logger.info { "output: #{output}" }
       end

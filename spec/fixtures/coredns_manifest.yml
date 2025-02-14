@@ -47,16 +47,16 @@ metadata:
     kubernetes.io/name: "CoreDNS"
     app.kubernetes.io/name: coredns
 rules:
-- apiGroups:
-  - ""
-  resources:
-  - endpoints
-  - services
-  - pods
-  - namespaces
-  verbs:
-  - list
-  - watch
+  - apiGroups:
+      - ""
+    resources:
+      - endpoints
+      - services
+      - pods
+      - namespaces
+    verbs:
+      - list
+      - watch
 ---
 # Source: coredns/templates/clusterrolebinding.yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -76,9 +76,9 @@ roleRef:
   kind: ClusterRole
   name: coredns-coredns
 subjects:
-- kind: ServiceAccount
-  name: default
-  namespace: default
+  - kind: ServiceAccount
+    name: default
+    namespace: default
 ---
 # Source: coredns/templates/service.yaml
 apiVersion: v1
@@ -93,16 +93,15 @@ metadata:
     kubernetes.io/cluster-service: "true"
     kubernetes.io/name: "CoreDNS"
     app.kubernetes.io/name: coredns
-  annotations:
-    {}
+  annotations: {}
 spec:
   selector:
     app.kubernetes.io/instance: "coredns"
     k8s-app: "coredns"
     app.kubernetes.io/name: coredns
   ports:
-  - {port: 53, protocol: UDP, name: udp-53}
-  - {port: 53, protocol: TCP, name: tcp-53}
+    - { port: 53, protocol: UDP, name: udp-53 }
+    - { port: 53, protocol: TCP, name: tcp-53 }
   type: ClusterIP
 ---
 # Source: coredns/templates/deployment.yaml
@@ -138,53 +137,53 @@ spec:
         app.kubernetes.io/instance: "coredns"
       annotations:
         checksum/config: 473c46ef33ae3e2811a84fd13c39de8f09ee48ee3de2e6a155431c511d7838f9
-        scheduler.alpha.kubernetes.io/critical-pod: ''
+        scheduler.alpha.kubernetes.io/critical-pod: ""
         scheduler.alpha.kubernetes.io/tolerations: '[{"key":"CriticalAddonsOnly", "operator":"Exists"}]'
     spec:
       terminationGracePeriodSeconds: 30
       serviceAccountName: default
       dnsPolicy: Default
       containers:
-      - name: "coredns"
-        image: "coredns/coredns:1.7.1"
-        imagePullPolicy: IfNotPresent
-        args: [ "-conf", "/etc/coredns/Corefile" ]
-        volumeMounts:
-        - name: config-volume
-          mountPath: /etc/coredns
-        resources:
-          limits:
-            cpu: 100m
-            memory: 128Mi
-          requests:
-            cpu: 100m
-            memory: 128Mi
-        ports:
-        - {containerPort: 53, protocol: UDP, name: udp-53}
-        - {containerPort: 53, protocol: TCP, name: tcp-53}
-        
-        livenessProbe:
-          httpGet:
-            path: /health
-            port: 8080
-            scheme: HTTP
-          initialDelaySeconds: 60
-          timeoutSeconds: 5
-          successThreshold: 1
-          failureThreshold: 5
-        readinessProbe:
-          httpGet:
-            path: /ready
-            port: 8181
-            scheme: HTTP
-          initialDelaySeconds: 10
-          timeoutSeconds: 5
-          successThreshold: 1
-          failureThreshold: 5
+        - name: "coredns"
+          image: "coredns/coredns:1.7.1"
+          imagePullPolicy: IfNotPresent
+          args: ["-conf", "/etc/coredns/Corefile"]
+          volumeMounts:
+            - name: config-volume
+              mountPath: /etc/coredns
+          resources:
+            limits:
+              cpu: 100m
+              memory: 128Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          ports:
+            - { containerPort: 53, protocol: UDP, name: udp-53 }
+            - { containerPort: 53, protocol: TCP, name: tcp-53 }
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+              scheme: HTTP
+            initialDelaySeconds: 60
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 5
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8181
+              scheme: HTTP
+            initialDelaySeconds: 10
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 5
       volumes:
         - name: config-volume
           configMap:
             name: coredns-coredns
             items:
-            - key: Corefile
-              path: Corefile
+              - key: Corefile
+                path: Corefile

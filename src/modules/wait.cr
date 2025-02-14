@@ -113,14 +113,14 @@ module KubectlClient
       logger.info { "Waiting for resource #{kind}/#{resource_name} to install" }
 
       second_count = 0
-      is_ready = resource_ready?(kind, namespace, resource_name)
+      is_ready = resource_ready?(kind, resource_name, namespace)
       until is_ready || second_count > wait_count
         if second_count % RESOURCE_WAIT_LOG_INTERVAL == 0
           logger.info { "seconds elapsed while waiting: #{second_count}" }
         end
 
-        sleep 1
-        is_ready = resource_ready?(kind, namespace, resource_name)
+        sleep 1.seconds
+        is_ready = resource_ready?(kind, resource_name, namespace)
         second_count += 1
       end
 
@@ -144,15 +144,30 @@ module KubectlClient
       logger.info { "Waiting for resource #{kind}/#{resource_name} to uninstall" }
 
       second_count = 0
-      resource_uninstalled = KubectlClient::Get.resource(kind, resource_name, namespace)
-      until resource_uninstalled != EMPTY_JSON || second_count > wait_count
+      begin
+        resource_uninstalled = KubectlClient::Get.resource(kind, resource_name, namespace)
+      rescue ex
+        if ex.message.try &.starts_with?("Error from server (NotFound):") == false
+          raise KubectlClient::ShellCMD::K8sClientCMDException.new(ex.message)
+        end
+        resource_uninstalled = EMPTY_JSON
+      end
+
+      until resource_uninstalled == EMPTY_JSON || second_count > wait_count
         if second_count % RESOURCE_WAIT_LOG_INTERVAL == 0
           logger.info { "seconds elapsed while waiting: #{second_count}" }
         end
 
-        sleep 1
-        resource_uninstalled = KubectlClient::Get.resource(kind, resource_name, namespace)
-        second_count += 1
+        sleep 2.seconds
+        begin
+          resource_uninstalled = KubectlClient::Get.resource(kind, resource_name, namespace)
+        rescue ex
+          if ex.message.try &.starts_with?("Error from server (NotFound):") == false
+            raise KubectlClient::ShellCMD::K8sClientCMDException.new(ex.message)
+          end
+          resource_uninstalled = EMPTY_JSON
+        end
+        second_count += 2
       end
 
       if resource_uninstalled == EMPTY_JSON
@@ -178,7 +193,7 @@ module KubectlClient
           logger.info { "seconds elapsed while waiting: #{second_count}" }
         end
 
-        sleep 3
+        sleep 3.seconds
         namespace = resource.dig?("metadata", "namespace")
         if namespace
           resource = KubectlClient::Get.resource(resource["kind"].as_s, resource.dig("metadata", "name").as_s)
@@ -215,7 +230,7 @@ module KubectlClient
           logger.info { "seconds elapsed while waiting: #{second_count}" }
         end
 
-        sleep 1
+        sleep 1.seconds
         apply_result = KubectlClient::Apply.file(manifest_file)
         apply_resp = apply_result[:output]
         second_count += 1
@@ -244,9 +259,9 @@ module KubectlClient
           logger.info { "seconds elapsed while waiting: #{second_count}" }
         end
 
-        sleep 3
+        sleep 3.seconds
         resource_created = resource_ready?(kind, resource_name, namespace)
-        second_count += 1
+        second_count += 3
       end
 
       resource_created

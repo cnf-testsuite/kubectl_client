@@ -18,14 +18,15 @@ module KubectlClient
     GOTEMPLATE
 
     def self.resource(kind : String, resource_name : String? = nil, namespace : String? = nil,
-                      all_namespaces : Bool = false, field_selector : String = "") : JSON::Any
+                      all_namespaces : Bool = false, field_selector : String? = nil, silent : Bool = false) : JSON::Any
       logger = @@logger.for("resource")
-      logger.info { "Get resource #{kind}" }
-      logger.info { "/#{resource_name}" } if resource_name
+      log_str = "Get resource #{kind}"
+      log_str += "/#{resource_name}" if resource_name
+      logger.info { "#{log_str}" } if !silent
 
       # resource_name.to_s will expand to "" in case of nil
       cmd = "kubectl get #{kind} #{resource_name}"
-      cmd = "#{cmd} --field-selector #{field_selector}" if field_selector
+      cmd = "#{cmd} --field-selector #{field_selector}" if field_selector && !resource_name
       cmd = "#{cmd} -n #{namespace}" if namespace && !all_namespaces
       cmd = "#{cmd} -A" if !namespace && all_namespaces
       cmd = "#{cmd} -o json"
@@ -112,14 +113,14 @@ module KubectlClient
             true
           end
         end
-        sleep 1
+        sleep 1.seconds
         retries = retries + 1
       end
 
       if nodes == empty_json_any
         logger.warn { "Could not retrieve any schedulable nodes" }
       end
-      logger.debug { "Schedulable nodes list: #{nodes}" }
+      logger.info { "Schedulable nodes list: '#{nodes.map { |item| item.dig?("metadata", "name") }.join(", ")}'" }
 
       nodes
     end
@@ -189,7 +190,7 @@ module KubectlClient
           end
         end
       end
-      logger.debug { "Pods found: #{pods_a}" }
+      logger.debug { "Found #{pods_a.size} pods: #{pods_a.map { |item| item.dig?("metadata", "name") }.join(", ")}" }
 
       pods_a
     end
@@ -199,7 +200,7 @@ module KubectlClient
       logger = @@logger.for("pods_by_resources")
       kind = resource_json["kind"]?
       name = resource_json["metadata"]["name"]?
-      logger.info { "Creating list of pods by resource : #{kind}/#{name} labels" }
+      logger.info { "Creating list of pods by resource: #{kind}/#{name} labels" }
 
       return [resource_json] if resource_json["kind"].as_s.downcase == "pod"
       if !name || !kind
@@ -207,7 +208,7 @@ module KubectlClient
         return [] of JSON::Any
       end
 
-      pods = resource("pods")
+      pods = resource("pods", silent: true)["items"].as_a
       # todo deployment labels may not match template metadata labels.
       # -- may need to match on selector matchlabels instead
       labels = resource_spec_labels(resource_json["kind"].as_s, name.as_s, namespace: namespace).as_h
@@ -220,7 +221,7 @@ module KubectlClient
       logger = @@logger.for("pods_by_labels")
       logger.info { "Creating list of pods that have labels: #{labels}" }
 
-      pods_json.select do |pod|
+      pods_json = pods_json.select do |pod|
         if labels == Hash(String, JSON::Any).new
           match = false
         else
@@ -247,7 +248,7 @@ module KubectlClient
       logger = @@logger.for("pods_by_labels")
       logger.info { "Creating list of pods that have labels: #{labels}" }
 
-      pods_json.select do |pod|
+      pods_json = pods_json.select do |pod|
         if labels == Hash(String, String).new
           match = false
         else
@@ -256,7 +257,7 @@ module KubectlClient
         # todo deployment labels may not match template metadata labels.
         # -- may need to match on selector matchlabels instead
         labels.map do |key, value|
-          if pod.dig?("metadata", "labels", key).as_s == value
+          if pod.dig?("metadata", "labels", key) == value
             match = true
           else
             match = false
@@ -265,7 +266,7 @@ module KubectlClient
         match
       end
       logger.debug { "Matched #{pods_json.size} pods: " +
-        "#{pods_json.map { |item| item.dig?("metadata", "name").as_s }.join(", ")}" }
+        "#{pods_json.map { |item| item.dig?("metadata", "name") }.join(", ")}" }
 
       pods_json
     end
@@ -334,9 +335,9 @@ module KubectlClient
 
       case kind.downcase
       when "pod"
-        resp = resource(kind, resource_name, namespace).dig?("spec", "containers")
+        resp = resource(kind, resource_name, namespace, silent: true).dig?("spec", "containers")
       when "deployment", "statefulset", "replicaset", "daemonset"
-        resp = resource(kind, resource_name, namespace).dig?("spec", "template", "spec", "containers")
+        resp = resource(kind, resource_name, namespace, silent: true).dig?("spec", "template", "spec", "containers")
       end
 
       return EMPTY_JSON if resp.nil?
@@ -361,42 +362,40 @@ module KubectlClient
       logger = @@logger.for("replica_count")
       logger.debug { "Get replica count of #{kind}/#{resource_name}" }
 
+      resource_json = resource(kind, resource_name, namespace, silent: true)
       case kind.downcase
       when "replicaset", "deployment", "statefulset"
-        current_json = resource(kind, resource_name, namespace).dig?("status", "readyReplicas")
-        desired_json = resource(kind, resource_name, namespace).dig?("status", "replicas")
-        unavailable_json = resource(kind, resource_name, namespace).dig?("status", "unavailableReplicas")
+        current_json = resource_json.dig?("status", "readyReplicas")
+        desired_json = resource_json.dig?("status", "replicas")
+        unavailable_json = resource_json.dig?("status", "unavailableReplicas")
       when "daemonset"
-        current_json = resource(kind, resource_name, namespace).dig?("status", "numberAvailable")
-        desired_json = resource(kind, resource_name, namespace).dig?("status", "desiredNumberScheduled")
-        unavailable_json = resource(kind, resource_name, namespace).dig?("status", "unavailableReplicas")
+        current_json = resource_json.dig?("status", "numberAvailable")
+        desired_json = resource_json.dig?("status", "desiredNumberScheduled")
+        unavailable_json = resource_json.dig?("status", "unavailableReplicas")
       end
 
       current = desired = unavailable = -1
-      current = current_json.to_s.to_i if current_json.nil?
-      desired = desired_json.to_s.to_i if desired_json.nil?
-      unavailable = unavailable_json.to_s.to_i if unavailable_json.nil?
+      current = current_json.to_s.to_i if !current_json.nil?
+      desired = desired_json.to_s.to_i if !desired_json.nil?
+      unavailable = unavailable_json.to_s.to_i if !unavailable_json.nil?
 
       logger.trace { "replicas: current = #{current}, desired = #{desired}, unavailable = #{unavailable}" }
 
       {current: current, desired: desired, unavailable: unavailable}
     end
 
-    # TODO add a spec for this
-    def self.pod_ready?(pod_name_prefix : String, field_selector : String = "", namespace : String? = nil) : Bool
+    def self.pod_ready?(pod_name_prefix : String, field_selector : String? = nil, namespace : String? = nil) : Bool
       logger = @@logger.for("pod_status")
       logger.info { "Get status of pod/#{pod_name_prefix}* with field selector: #{field_selector}" }
 
-      all_pods_json = resource("pods", namespace: namespace, field_selector: field_selector)
+      all_pods_json = resource("pods", namespace: namespace, field_selector: field_selector, silent: true)
       return false if all_pods_json.dig?("items").nil?
 
       all_pods = all_pods_json.dig("items").as_a
         .select do |pod_json|
-          pod_name = pod_json.dig("metadata", "name").as_s
-          pod_name =~ /pod_name_prefix/ &&
-            pod_json.dig("status", "containerStatuses").as_a.each do |cstatus|
-              cstatus.dig("ready").as_s.strip.downcase == "True"
-            end
+          pod_name = pod_json.dig("metadata", "name").as_s.strip
+          all_ready = pod_json.dig("status", "containerStatuses").as_a.all? { |cstatus| cstatus.dig("ready") == true }
+          /#{pod_name_prefix}/.match(pod_name) && all_ready
         end
         .map { |pod_json| pod_json.dig("metadata", "name").as_s }
 
