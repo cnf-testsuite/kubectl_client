@@ -6,7 +6,7 @@ require "./src/utils/utils.cr"
 require "./src/utils/system_information.cr"
 
 module KubectlClient
-  Log = ::Log.for("k8s-client")
+  Log = ::Log.for("KubectlClient")
 
   alias CMDResult = NamedTuple(status: Process::Status, output: String, error: String)
   alias BackgroundCMDResult = NamedTuple(process: Process, output: String, error: String)
@@ -44,7 +44,7 @@ module KubectlClient
       {status: status, output: output.to_s, error: stderr.to_s}
     end
 
-    def self.new(cmd, logger : ::Log = Log, force_output = false) : CMDResult
+    def self.new(cmd, logger : ::Log = Log, force_output = false) : BackgroundCMDResult
       logger = logger.for("cmd-background")
       logger.debug { "command: #{cmd}" }
       process = Process.new(

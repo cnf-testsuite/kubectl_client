@@ -1,6 +1,6 @@
 module KubectlClient
   module Rollout
-    @@logger : ::Log = Log.for("rollout")
+    @@logger : ::Log = Log.for("Rollout")
 
     def self.status(kind : String, resource_name : String, namespace : String? = nil, timeout : String = "30s")
       logger = @@logger.for("status")
@@ -20,7 +20,7 @@ module KubectlClient
   end
 
   module Apply
-    @@logger : ::Log = Log.for("apply")
+    @@logger : ::Log = Log.for("Apply")
 
     def self.resource(kind : String, resource_name : String, namespace : String? = nil, values : String? = nil)
       logger = @@logger.for("resource")
@@ -48,7 +48,7 @@ module KubectlClient
   end
 
   module Delete
-    @@logger : ::Log = Log.for("delete")
+    @@logger : ::Log = Log.for("Delete")
 
     def self.resource(kind : String, resource_name : String, namespace : String? = nil,
                       labels : Hash(String, String)? = {} of String => String)
@@ -77,7 +77,7 @@ module KubectlClient
   end
 
   module Utils
-    @@logger : ::Log = Log.for("utils")
+    @@logger : ::Log = Log.for("Utils")
 
     def self.logs(pod_name : String, container_name : String? = nil, namespace : String? = nil, options : String? = nil)
       logger = @@logger.for("logs")

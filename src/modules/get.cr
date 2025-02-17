@@ -1,6 +1,6 @@
 module KubectlClient
   module Get
-    @@logger : ::Log = Log.for("get")
+    @@logger : ::Log = Log.for("Get")
 
     @@schedulable_nodes_template : String = <<-GOTEMPLATE.strip
     {{- range .items -}}
