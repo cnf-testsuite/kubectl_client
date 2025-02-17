@@ -393,9 +393,14 @@ module KubectlClient
 
       all_pods = all_pods_json.dig("items").as_a
         .select do |pod_json|
-          pod_name = pod_json.dig("metadata", "name").as_s.strip
-          all_ready = pod_json.dig("status", "containerStatuses").as_a.all? { |cstatus| cstatus.dig("ready") == true }
-          /#{pod_name_prefix}/.match(pod_name) && all_ready
+          begin
+            pod_name = pod_json.dig("metadata", "name").as_s.strip
+            all_ready = pod_json.dig("status", "containerStatuses").as_a.all? { |cstatus| cstatus.dig("ready") == true }
+            /#{pod_name_prefix}/.match(pod_name) && all_ready
+          rescue ex
+            logger.error { "exception rescued: #{ex}" }
+            false
+          end
         end
         .map { |pod_json| pod_json.dig("metadata", "name").as_s }
 

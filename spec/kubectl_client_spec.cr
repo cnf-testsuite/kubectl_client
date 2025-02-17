@@ -53,7 +53,7 @@ describe "KubectlClient" do
       true.should be_false
     end
   ensure
-    KubectlClient::Delete.file("./spec/fixtures/coredns_manifest.yml")
+    KubectlClient::Delete.file("./spec/fixtures/manifest.yml")
   end
 
   it "'#KubectlClient::Wait.wait_for_resource_key_value' should wait for a resource and key/value combination", tags: ["kubectl-nodes"] do
@@ -67,7 +67,7 @@ describe "KubectlClient" do
   it "'#KubectlClient::Get.schedulable_nodes_list' should return all schedulable worker nodes", tags: ["kubectl-nodes"] do
     retry_limit = 50
     retries = 1
-    empty_json_any = JSON.parse(%({}))
+    empty_json_any = KubectlClient::EMPTY_JSON
     nodes = [empty_json_any]
     until (nodes != [empty_json_any]) || retries > retry_limit
       sleep 1.seconds
@@ -91,7 +91,7 @@ describe "KubectlClient" do
   it "'#KubectlClient::Get.resource_map' should extract a subset of manifest resource json", tags: ["kubectl-nodes"] do
     retry_limit = 50
     retries = 1
-    empty_json_any = JSON.parse(%({}))
+    empty_json_any = KubectlClient::EMPTY_JSON
     filtered_nodes = [empty_json_any]
     until (filtered_nodes != [empty_json_any]) || retries > retry_limit
       sleep 1.seconds
