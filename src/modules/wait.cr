@@ -25,7 +25,7 @@ module KubectlClient
       found_terminating = true
       second_count = 0
       while found_terminating && second_count < wait_count
-        ShellCMD.raise_exc_on_error &.result = ShellCMD.run(cmd, logger)
+        result = ShellCMD.raise_exc_on_error { ShellCMD.run(cmd, logger) }
         if result[:output].match(/([\s+]Terminating)/)
           found_terminating = true
           second_count = second_count + 1
@@ -42,9 +42,11 @@ module KubectlClient
       false
     end
 
-    def self.wait_for_condition(kind : String, resource_name : String, condition : String, namespace : String? = nil)
+    def self.wait_for_condition(
+      kind : String, resource_name : String, condition : String, wait_count : Int32 = 180, namespace : String? = nil
+    )
       logger = @@logger.for("wait_for_condition")
-      cmd = "kubectl wait #{kind}/#{resource_name} --for=#{condition}"
+      cmd = "kubectl wait #{kind}/#{resource_name} --for=#{condition} --timeout=#{wait_count}s"
       cmd = "#{cmd} -n #{namespace}" if namespace
 
       ShellCMD.raise_exc_on_error { ShellCMD.run(cmd, logger) }
@@ -146,10 +148,7 @@ module KubectlClient
       second_count = 0
       begin
         resource_uninstalled = KubectlClient::Get.resource(kind, resource_name, namespace)
-      rescue ex
-        if ex.message.try &.starts_with?("Error from server (NotFound):") == false
-          raise KubectlClient::ShellCMD::K8sClientCMDException.new(ex.message)
-        end
+      rescue ex : KubectlClient::ShellCMD::NotFoundError
         resource_uninstalled = EMPTY_JSON
       end
 
@@ -161,10 +160,7 @@ module KubectlClient
         sleep 2.seconds
         begin
           resource_uninstalled = KubectlClient::Get.resource(kind, resource_name, namespace)
-        rescue ex
-          if ex.message.try &.starts_with?("Error from server (NotFound):") == false
-            raise KubectlClient::ShellCMD::K8sClientCMDException.new(ex.message)
-          end
+        rescue ex : KubectlClient::ShellCMD::NotFoundError
           resource_uninstalled = EMPTY_JSON
         end
         second_count += 2

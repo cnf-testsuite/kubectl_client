@@ -39,7 +39,7 @@ module KubectlClient
       ShellCMD.raise_exc_on_error { ShellCMD.run(cmd, logger) }
     end
 
-    def self.namespace(name : String, kubeconfig : String? = nil)
+    def self.namespace(name : String)
       logger = @@logger.for("namespace")
       cmd = "kubectl create namespace #{name}"
 
@@ -50,8 +50,8 @@ module KubectlClient
   module Delete
     @@logger : ::Log = Log.for("Delete")
 
-    def self.resource(kind : String, resource_name : String, namespace : String? = nil,
-                      labels : Hash(String, String)? = {} of String => String)
+    def self.resource(kind : String, resource_name : String? = nil, namespace : String? = nil,
+                      labels : Hash(String, String)? = {} of String => String, extra_opts : String? = nil)
       logger = @@logger.for("resource")
       cmd = "kubectl delete #{kind}/#{resource_name}"
       cmd = "#{cmd} -n #{namespace}" if namespace
@@ -59,6 +59,7 @@ module KubectlClient
         label_options = labels.map { |key, value| "-l #{key}=#{value}" }.join(" ")
         cmd = "#{cmd} #{label_options}"
       end
+      cmd = "#{cmd} #{extra_opts}" if extra_opts
 
       ShellCMD.raise_exc_on_error { ShellCMD.run(cmd, logger) }
     end
@@ -106,7 +107,7 @@ module KubectlClient
       cmd = "#{cmd} -c #{container_name}" if container_name
       cmd = "-- #{command}"
 
-      ShellCMD.raise_exc_on_error { ShellCMD.new(cmd, logger) }
+      ShellCMD.new(cmd, logger)
     end
 
     def self.copy_to_pod(pod_name : String, source : String, destination : String,
@@ -191,7 +192,9 @@ module KubectlClient
     )
       logger = @@logger.for("set_image")
 
-      cmd = version_tag ? "kubectl set image #{resource_kind}/#{resource_name}#{container_name}=#{image_name}:#{version_tag} --record" : "kubectl set image #{resource_kind}/#{resource_name} #{container_name}=#{image_name} --record"
+      cmd = version_tag ? 
+        "kubectl set image #{resource_kind}/#{resource_name}#{container_name}=#{image_name}:#{version_tag} --record" :
+        "kubectl set image #{resource_kind}/#{resource_name} #{container_name}=#{image_name} --record"
       cmd = "#{cmd} -n #{namespace}" if namespace
 
       ShellCMD.raise_exc_on_error { ShellCMD.run(cmd, logger) }

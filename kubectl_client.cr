@@ -69,13 +69,20 @@ module KubectlClient
 
     def self.raise_exc_on_error(&)
       result = yield
-      # TODO: raise different kind of exceptions based on type of error (network issue, resource does not exits etc.)
       unless result[:status].success?
-        raise K8sClientCMDException.new(result[:error])
+        # Add new cases to this switch if needed
+        case
+        when /#{result[:error]}/.match(ALREADY_EXISTS_ERR_MATCH)
+          raise AlreadyExistsError.new(result[:error], result[:status].exit_code)
+        when /#{result[:error]}/.match(NOT_FOUND_ERR_MATCH)
+          raise NotFoundError.new(result[:error], result[:status].exit_code)
+        else
+          raise K8sClientCMDException.new(result[:error], result[:status].exit_code)
+        end
       end
       result
     end
-
+    
     def self.parse_get_result(result : CMDResult)
       if result[:status].success? && !result[:output].empty?
         JSON.parse(result[:output])
@@ -85,6 +92,17 @@ module KubectlClient
     end
 
     class K8sClientCMDException < Exception
+      MSG_TEMPLATE = "kubectl CMD failed, exit code: %s, error: %s"
+
+      def initialize(message : String?, exit_code : Int32, cause : Exception? = nil)
+        super(MSG_TEMPLATE % {exit_code, message}, cause)
+      end
+    end
+
+    class AlreadyExistsError < K8sClientCMDException
+    end
+
+    class NotFoundError < K8sClientCMDException
     end
   end
 

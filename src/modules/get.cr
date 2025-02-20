@@ -18,15 +18,18 @@ module KubectlClient
     GOTEMPLATE
 
     def self.resource(kind : String, resource_name : String? = nil, namespace : String? = nil,
-                      all_namespaces : Bool = false, field_selector : String? = nil, silent : Bool = false) : JSON::Any
+                      all_namespaces : Bool = false, field_selector : String? = nil,
+                      selector : String? = nil, silent : Bool = false) : JSON::Any
       logger = @@logger.for("resource")
       log_str = "Get resource #{kind}"
       log_str += "/#{resource_name}" if resource_name
       logger.info { "#{log_str}" } if !silent
 
+      # TODO: (rafal-lal): consider adding CMD builder class / functionality
       # resource_name.to_s will expand to "" in case of nil
       cmd = "kubectl get #{kind} #{resource_name}"
       cmd = "#{cmd} --field-selector #{field_selector}" if field_selector && !resource_name
+      cmd = "#{cmd} --selector #{selector}" if selector && !resource_name
       cmd = "#{cmd} -n #{namespace}" if namespace && !all_namespaces
       cmd = "#{cmd} -A" if !namespace && all_namespaces
       cmd = "#{cmd} -o json"
@@ -36,10 +39,10 @@ module KubectlClient
       KubectlClient::ShellCMD.parse_get_result(result)
     end
 
-    def self.privileged_containers(namespace = "--all-namespaces") : JSON::Any
+    def self.privileged_containers(namespace : String = "--all-namespaces") : JSON::Any
       logger = @@logger.for("privileged_containers")
       cmd = "kubectl get pods #{namespace} -o " +
-            "jsonpath='{.items[*].spec.containers[?(@.securityContext.privileged==true)].name}'"
+            "jsonpath='{.items[*].spec.containers[?(@.securityContext.privileged==true)]}'"
       result = ShellCMD.raise_exc_on_error { ShellCMD.run(cmd, logger) }
 
       KubectlClient::ShellCMD.parse_get_result(result)
@@ -197,7 +200,7 @@ module KubectlClient
 
     # todo default flag for schedulable pods vs all pods
     def self.pods_by_resource_labels(resource_json : JSON::Any, namespace : String? = nil) : Array(JSON::Any)
-      logger = @@logger.for("pods_by_resources")
+      logger = @@logger.for("pods_by_resource_labels")
       kind = resource_json["kind"]?
       name = resource_json["metadata"]["name"]?
       logger.info { "Creating list of pods by resource: #{kind}/#{name} labels" }
@@ -277,7 +280,7 @@ module KubectlClient
       logger.info { "Matching pod: #{pod_name} to service" }
 
       services = KubectlClient::Get.resource("service", all_namespaces: true)
-      matched_service : JSON::Any?
+      matched_service : JSON::Any? = nil
       services["items"].as_a.each do |service|
         service_labels = service.dig?("spec", "selector")
         next unless service_labels
@@ -292,6 +295,7 @@ module KubectlClient
 
       if matched_service.nil?
         logger.warn { "Could not match pod to any service" }
+        return matched_service
       end
       logger.debug { "Pod: #{pod_name} matched to service: #{matched_service.dig("metadata", "name").as_s}" }
 
@@ -305,7 +309,7 @@ module KubectlClient
       service_labels = service.dig?("spec", "selector")
       return unless service_labels
 
-      pods = KubectlClient::Get.pods
+      pods = KubectlClient::Get.resource("pods")
       service_pods = KubectlClient::Get.pods_by_labels(pods["items"].as_a, service_labels.as_h)
     end
 
@@ -324,9 +328,9 @@ module KubectlClient
         end
       end
       logger.debug { "Matched #{matched_pods.size} pods: " +
-        "#{matched_pods.map { |item| item.dig?("metadata", "name").as_s }.join(", ")}" }
+        "#{matched_pods.map { |item| item.dig?("metadata", "name") }.join(", ")}" }
 
-      matched_pod
+      matched_pods
     end
 
     def self.resource_containers(kind : String, resource_name : String, namespace : String? = nil) : JSON::Any
@@ -350,10 +354,13 @@ module KubectlClient
 
       case kind.downcase
       when "pod"
-        resp = resource(kind, resource_name, namespace).dig?("spec", "volumes")
+        resp = resource(kind, resource_name, namespace).dig("spec", "volumes")
       when "deployment", "statefulset", "replicaset", "daemonset"
-        resp = resource(kind, resource_name, namespace).dig?("spec", "template", "spec", "volumes")
+        resp = resource(kind, resource_name, namespace).dig("spec", "template", "spec", "volumes")
       end
+
+      return EMPTY_JSON if resp.nil?
+      return resp
     end
 
     def self.replica_count(
@@ -384,6 +391,33 @@ module KubectlClient
       {current: current, desired: desired, unavailable: unavailable}
     end
 
+    # TODO (rafal-lal): add spec for this method
+    def self.match_pods_by_prefix(
+      pod_name_prefix : String, field_selector : String? = nil, namespace : String? = nil
+    ) : Array(String)
+      logger = @@logger.for("match_pods_by_prefix")
+      logger.info { "Get pods with with prefix: #{pod_name_prefix} with field selector: #{field_selector}" }
+
+      all_pods_json = resource("pods", namespace: namespace, field_selector: field_selector, silent: true)
+      return [] of String if all_pods_json.dig?("items").nil?
+
+      all_pods = all_pods_json.dig("items").as_a
+        .select do |pod_json|
+          begin
+            pod_name = pod_json.dig("metadata", "name").as_s.strip
+            /#{pod_name_prefix}/.match(pod_name) != nil
+          rescue ex
+            logger.error { "exception rescued: #{ex}" }
+            false
+          end
+        end
+        .map { |pod_json| pod_json.dig("metadata", "name").as_s }
+
+      logger.debug { "Matched pods: #{all_pods.join(", ")}" }
+
+      all_pods
+    end
+
     def self.pod_ready?(pod_name_prefix : String, field_selector : String? = nil, namespace : String? = nil) : Bool
       logger = @@logger.for("pod_status")
       logger.info { "Get status of pod/#{pod_name_prefix}* with field selector: #{field_selector}" }
@@ -405,7 +439,7 @@ module KubectlClient
         .map { |pod_json| pod_json.dig("metadata", "name").as_s }
 
       logger.debug { "'Ready' pods: #{all_pods.join(", ")}" }
-      return all_pods.size > 0 ? true : false
+      all_pods.size > 0 ? true : false
     end
 
     def self.node_ready?(node_name : String) : Bool
@@ -413,9 +447,9 @@ module KubectlClient
       logger.info { "Check if node status is: Ready" }
 
       cmd = "kubectl get nodes #{node_name} -o jsonpath='{.status.conditions[?(@.type == \"Ready\")].status}'"
-      ShellCMD.raise_exc_on_error { result = ShellCMD.run(cmd, logger) }
+      result = ShellCMD.raise_exc_on_error { ShellCMD.run(cmd, logger) }
 
-      return Bool.parse?(result[:output].downcase)
+      result[:output].downcase == "true"
     end
 
     def self.resource_spec_labels(kind : String, resource_name : String, namespace : String? = nil) : JSON::Any
@@ -457,16 +491,16 @@ module KubectlClient
 
       cmd = "kubectl get nodes --selector='!node-role.kubernetes.io/master' " +
             "-o 'go-template=#{@@schedulable_nodes_template}'"
-      ShellCMD.raise_exc_on_error { result = ShellCMD.run(cmd, logger) }
+      result = ShellCMD.raise_exc_on_error { ShellCMD.run(cmd, logger) }
 
       result[:output].split("\n")
     end
 
-    def self.pv_items_by_claim_name(claim_name : String) : JSON::Any?
+    def self.pv_items_by_claim_name(claim_name : String) : Array(JSON::Any)
       logger = @@logger.for("pv_items_by_claim_name")
       logger.info { "Get PV items by claim name: #{claim_name}" }
 
-      items = pv["items"].as_a.map do |x|
+      items = resource("pv")["items"].as_a.map do |x|
         begin
           if x["spec"]["claimRef"]["name"] == claim_name
             x
