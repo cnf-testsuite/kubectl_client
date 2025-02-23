@@ -68,10 +68,7 @@ module KubectlClient
       logger = @@logger.for("file")
       cmd = "kubectl delete -f #{file_name}"
       cmd = "#{cmd} -n #{namespace}" if namespace
-      if wait
-        cmd = "#{cmd} --wait=true"
-        logger.info { "Waiting until requested resource is deleted" }
-      end
+      cmd = "#{cmd} --wait=#{wait.to_s}"
 
       ShellCMD.raise_exc_on_error { ShellCMD.run(cmd, logger) }
     end

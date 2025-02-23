@@ -140,7 +140,8 @@ module KubectlClient
       kind : String,
       resource_name : String,
       wait_count : Int32 = 180,
-      namespace : String? = "default"
+      namespace : String? = "default",
+      deep_check : Bool = true
     ) : Bool
       logger = @@logger.for("resource_wait_for_uninstall")
       logger.info { "Waiting for resource #{kind}/#{resource_name} to uninstall" }
@@ -152,6 +153,7 @@ module KubectlClient
         resource_uninstalled = EMPTY_JSON
       end
 
+      # Wait for core resource to uninstall
       until resource_uninstalled == EMPTY_JSON || second_count > wait_count
         if second_count % RESOURCE_WAIT_LOG_INTERVAL == 0
           logger.info { "seconds elapsed while waiting: #{second_count}" }
@@ -166,13 +168,57 @@ module KubectlClient
         second_count += 2
       end
 
+      deep_check_result = false
+  
       if resource_uninstalled == EMPTY_JSON
+        # Verify that associated pods are not stuck
+        if deep_check && ["deployment", "statefulset", "replicaset", "daemonset", "job"].includes?(kind)
+          Log.info { "Waiting for associated pods to uninstall" }
+          deep_check_result = wait_for_associated_pods(kind, resource_name, namespace, wait_count // 2)
+        end
+      end
+
+      if !(resource_uninstalled == EMPTY_JSON) || (deep_check && !deep_check_result)
+        logger.error { "#{kind}/#{resource_name} is still present" }
+        false
+      else
         logger.info { "#{kind}/#{resource_name} was uninstalled" }
         true
-      else
-        logger.warn { "#{kind}/#{resource_name} is still present" }
-        false
       end
+    end
+
+    private def self.wait_for_associated_pods(
+      kind : String,
+      resource_name : String,
+      namespace : String,
+      wait_count : Int32
+    ) : Bool
+      logger = @@logger.for("wait_for_associated_pods")
+      labels = KubectlClient::Get.resource_spec_labels(kind, resource_name, namespace)
+      if labels == EMPTY_JSON
+        return true
+      end
+
+      second_count = 0
+      while second_count < wait_count
+        # Retrieve the pods in the given namespace.
+        pods_json = KubectlClient::Get.resource("pods", nil, namespace, silent: true)
+        pods_items = pods_json["items"].as_a
+    
+        # Filter the pods by matching their labels against the provided labels.
+        # (Assuming that the `pods_by_labels` function is already defined and works as expected.)
+        matched_pods = KubectlClient::Get.pods_by_labels(pods_items, labels.as_h)
+        if matched_pods.empty?
+          logger.info { "All associated pods for #{kind}/#{resource_name} have been removed." }
+          return true
+        end
+
+        sleep 2.seconds
+        second_count += 2
+      end
+    
+      logger.error { "Timeout reached. Associated pods for #{kind}/#{resource_name} still exist after #{wait_count} seconds." }
+      false
     end
 
     private def self.wait_for_key_value(resource : JSON::Any,
