@@ -122,7 +122,7 @@ describe "KubectlClient" do
     (current_replicas.to_i > 0).should be_true
   end
 
-  it "'Kubectl::Wait.resource_wait_for_uninstall' should wait for a cnf to be installed", tags: ["kubectl-install"] do
+  it "'Kubectl::Wait.resource_wait_for_uninstall' should wait for a cnf to be uninstalled", tags: ["kubectl-install"] do
     (KubectlClient::Apply.file("./spec/fixtures/wordpress_manifest.yml")).should be_truthy
 
     KubectlClient::Delete.file("./spec/fixtures/wordpress_manifest.yml")

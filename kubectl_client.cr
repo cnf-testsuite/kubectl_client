@@ -72,9 +72,9 @@ module KubectlClient
       unless result[:status].success?
         # Add new cases to this switch if needed
         case
-        when /#{result[:error]}/.match(ALREADY_EXISTS_ERR_MATCH)
+        when /#{ALREADY_EXISTS_ERR_MATCH}/.match(result[:error])
           raise AlreadyExistsError.new(result[:error], result[:status].exit_code)
-        when /#{result[:error]}/.match(NOT_FOUND_ERR_MATCH)
+        when /#{NOT_FOUND_ERR_MATCH}/.match(result[:error])
           raise NotFoundError.new(result[:error], result[:status].exit_code)
         else
           raise K8sClientCMDException.new(result[:error], result[:status].exit_code)

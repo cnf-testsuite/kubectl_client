@@ -7,6 +7,6 @@ module KubectlClient
   EMPTY_JSON        = JSON.parse(%({}))
 
   # kubectl CMD errors
-  ALREADY_EXISTS_ERR_MATCH = "Error from server (AlreadyExists):"
-  NOT_FOUND_ERR_MATCH      = "Error from server (NotFound):"
+  ALREADY_EXISTS_ERR_MATCH = "AlreadyExists"
+  NOT_FOUND_ERR_MATCH      = "NotFound"
 end
