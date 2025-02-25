@@ -198,7 +198,8 @@ module KubectlClient
       pods_a
     end
 
-    # todo default flag for schedulable pods vs all pods
+    # TODO: (rafal-lal) if namespace not provided, automatically assume all_namespaces rather than default ->
+    #   make sure that is the case throughout the codebase
     def self.pods_by_resource_labels(resource_json : JSON::Any, namespace : String? = nil) : Array(JSON::Any)
       logger = @@logger.for("pods_by_resource_labels")
       kind = resource_json["kind"]?
@@ -211,7 +212,12 @@ module KubectlClient
         return [] of JSON::Any
       end
 
-      pods = resource("pods", silent: true)["items"].as_a
+      if namespace.nil?
+        pods = resource("pods", silent: true, all_namespaces: true)["items"].as_a
+      else
+        pods = resource("pods", silent: true, namespace: namespace)["items"].as_a
+      end
+
       # todo deployment labels may not match template metadata labels.
       # -- may need to match on selector matchlabels instead
       labels = resource_spec_labels(resource_json["kind"].as_s, name.as_s, namespace: namespace).as_h
