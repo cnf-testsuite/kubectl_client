@@ -95,7 +95,7 @@ module KubectlClient
       cmd = "kubectl exec #{pod_name}"
       cmd = "#{cmd} -n #{namespace}" if namespace
       cmd = "#{cmd} -c #{container_name}" if container_name
-      cmd = "-- #{command}"
+      cmd = "#{cmd} -- #{command}"
 
       ShellCMD.raise_exc_on_error { ShellCMD.run(cmd, logger) }
     end
@@ -105,7 +105,7 @@ module KubectlClient
       cmd = "kubectl exec #{pod_name}"
       cmd = "#{cmd} -n #{namespace}" if namespace
       cmd = "#{cmd} -c #{container_name}" if container_name
-      cmd = "-- #{command}"
+      cmd = "#{cmd} -- #{command}"
 
       ShellCMD.new(cmd, logger)
     end
