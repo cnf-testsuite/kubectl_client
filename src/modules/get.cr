@@ -36,16 +36,31 @@ module KubectlClient
 
       result = ShellCMD.raise_exc_on_error { ShellCMD.run(cmd, logger) }
 
-      KubectlClient::ShellCMD.parse_get_result(result)
+      if result[:status].success? && !result[:output].empty?
+        JSON.parse(result[:output])
+      else
+        EMPTY_JSON
+      end
     end
 
-    def self.privileged_containers(namespace : String = "--all-namespaces") : JSON::Any
+    def self.privileged_containers(namespace : String? = nil, all_namespaces : Bool? = true) : Array(JSON::Any)
       logger = @@logger.for("privileged_containers")
-      cmd = "kubectl get pods #{namespace} -o " +
-            "jsonpath='{.items[*].spec.containers[?(@.securityContext.privileged==true)]}'"
-      result = ShellCMD.raise_exc_on_error { ShellCMD.run(cmd, logger) }
+      logger.debug { "Get privileged containers" }
 
-      KubectlClient::ShellCMD.parse_get_result(result)
+      pods = resource("pods", namespace: namespace, all_namespaces: all_namespaces).dig("items").as_a
+      privileged_containers = pods.map do |pod|
+        pod.dig("spec", "containers").as_a.map do |container|
+          if container.dig?("securityContext", "privileged") == true
+            container
+          else
+            nil
+          end
+        end.compact
+      end.flatten
+      puts privileged_containers
+      logger.debug { "Found #{privileged_containers.size} privileged containers" }
+
+      privileged_containers
     end
 
     def self.resource_map(k8s_manifest, &)
@@ -350,7 +365,7 @@ module KubectlClient
         resp = resource(kind, resource_name, namespace, silent: true).dig?("spec", "template", "spec", "containers")
       end
 
-      return EMPTY_JSON if resp.nil?
+      return EMPTY_JSON_ARRAY if resp.nil?
       return resp
     end
 

@@ -76,19 +76,13 @@ module KubectlClient
           raise AlreadyExistsError.new(result[:error], result[:status].exit_code)
         when /#{NOT_FOUND_ERR_MATCH}/.match(result[:error])
           raise NotFoundError.new(result[:error], result[:status].exit_code)
+        when /#{NETWORK_ERR_MATCH}/i.match(result[:error])
+          raise NetworkError.new(result[:error], result[:status].exit_code)
         else
-          raise K8sClientCMDException.new(result[:error], result[:status].exit_code)
+          raise UnspecifiedError.new(result[:error], result[:status].exit_code)
         end
       end
       result
-    end
-    
-    def self.parse_get_result(result : CMDResult)
-      if result[:status].success? && !result[:output].empty?
-        JSON.parse(result[:output])
-      else
-        EMPTY_JSON
-      end
     end
 
     class K8sClientCMDException < Exception
@@ -103,6 +97,12 @@ module KubectlClient
     end
 
     class NotFoundError < K8sClientCMDException
+    end
+
+    class NetworkError < K8sClientCMDException
+    end
+
+    class UnspecifiedError < K8sClientCMDException
     end
   end
 

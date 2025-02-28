@@ -5,8 +5,10 @@ module KubectlClient
   # https://www.capitalone.com/tech/cloud/container-runtime/
   OCI_RUNTIME_REGEX = /containerd|docker|podman|runc|railcar|crun|rkt|gviso|nabla|runv|clearcontainers|kata|cri-o/i
   EMPTY_JSON        = JSON.parse(%({}))
+  EMPTY_JSON_ARRAY        = JSON.parse(%([]))
 
   # kubectl CMD errors
   ALREADY_EXISTS_ERR_MATCH = "AlreadyExists"
-  NOT_FOUND_ERR_MATCH      = "NotFound"
+  NOT_FOUND_ERR_MATCH      = "NotFound|does not exist"
+  NETWORK_ERR_MATCH = "Unable to connect to the server"
 end

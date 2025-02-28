@@ -51,9 +51,14 @@ module KubectlClient
     @@logger : ::Log = Log.for("Delete")
 
     def self.resource(kind : String, resource_name : String? = nil, namespace : String? = nil,
-                      labels : Hash(String, String)? = {} of String => String, extra_opts : String? = nil)
+                      labels : Hash(String, String) = {} of String => String, extra_opts : String? = nil)
       logger = @@logger.for("resource")
-      cmd = "kubectl delete #{kind}/#{resource_name}"
+      log_str = "Delete resource #{kind}"
+      log_str += "/#{resource_name}" if resource_name
+      logger.info { "#{log_str}" }
+
+      # resource_name.to_s will expand to "" in case of nil
+      cmd = "kubectl delete #{kind} #{resource_name}"
       cmd = "#{cmd} -n #{namespace}" if namespace
       unless labels.empty?
         label_options = labels.map { |key, value| "-l #{key}=#{value}" }.join(" ")
@@ -82,24 +87,36 @@ module KubectlClient
 
     def self.logs(pod_name : String, container_name : String? = nil, namespace : String? = nil, options : String? = nil)
       logger = @@logger.for("logs")
-      cmd = "kubectl logs"
-      cmd = "#{cmd} -n #{namespace}" if namespace
+      cmd = "kubectl logs #{pod_name}"
       cmd = "#{cmd} -c #{container_name}" if container_name
+      cmd = "#{cmd} -n #{namespace}" if namespace
       cmd = "#{cmd} #{options}" if options
 
       ShellCMD.raise_exc_on_error { ShellCMD.run(cmd, logger) }
     end
 
+    # Exceptions (other than network) not raised in this method as 'command' can be whatever caller desires,
+    # unlike other methods in which method body will build a valid command forced by its arguments.
     def self.exec(pod_name : String, command : String, container_name : String? = nil, namespace : String? = nil)
       logger = @@logger.for("exec")
       cmd = "kubectl exec #{pod_name}"
       cmd = "#{cmd} -n #{namespace}" if namespace
       cmd = "#{cmd} -c #{container_name}" if container_name
       cmd = "#{cmd} -- #{command}"
+      
+      result = ShellCMD.run(cmd, logger)
+      begin
+        ShellCMD.raise_exc_on_error { result }
+      rescue ex
+        if ex.is_a?(KubectlClient::ShellCMD::NetworkError)
+          raise ex
+        end
+      end
 
-      ShellCMD.raise_exc_on_error { ShellCMD.run(cmd, logger) }
+      result
     end
 
+    # Use with caution as there is no error handling due to process being started in the background.
     def self.exec_bg(pod_name : String, command : String, container_name : String? = nil, namespace : String? = nil)
       logger = @@logger.for("exec_bg")
       cmd = "kubectl exec #{pod_name}"
@@ -193,8 +210,8 @@ module KubectlClient
       logger = @@logger.for("set_image")
 
       cmd = version_tag ? 
-        "kubectl set image #{resource_kind}/#{resource_name}#{container_name}=#{image_name}:#{version_tag} --record" :
-        "kubectl set image #{resource_kind}/#{resource_name} #{container_name}=#{image_name} --record"
+        "kubectl set image #{resource_kind}/#{resource_name} #{container_name}=#{image_name}:#{version_tag}" :
+        "kubectl set image #{resource_kind}/#{resource_name} #{container_name}=#{image_name}"
       cmd = "#{cmd} -n #{namespace}" if namespace
 
       ShellCMD.raise_exc_on_error { ShellCMD.run(cmd, logger) }
