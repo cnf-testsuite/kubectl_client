@@ -375,12 +375,12 @@ module KubectlClient
 
       case kind.downcase
       when "pod"
-        resp = resource(kind, resource_name, namespace).dig("spec", "volumes")
+        resp = resource(kind, resource_name, namespace).dig?("spec", "volumes")
       when "deployment", "statefulset", "replicaset", "daemonset"
-        resp = resource(kind, resource_name, namespace).dig("spec", "template", "spec", "volumes")
+        resp = resource(kind, resource_name, namespace).dig?("spec", "template", "spec", "volumes")
       end
 
-      return EMPTY_JSON if resp.nil?
+      return EMPTY_JSON_ARRAY if resp.nil?
       return resp
     end
 
