@@ -78,7 +78,7 @@ module KubectlClient
       kind : String,
       resource_name : String,
       dig_params : Tuple,
-      value : (String?) = nil,
+      value : String? = nil,
       wait_count : Int32 = 180,
       namespace : String = "default",
     ) : Bool
@@ -90,7 +90,8 @@ module KubectlClient
       when "pod", "replicaset", "deployment", "statefulset", "daemonset"
         is_ready = resource_wait_for_install(kind, resource_name, wait_count, namespace)
       else
-        is_ready = resource_ready?(kind, resource_name, namespace)
+        # If not any of the above resources, then assume resource is available.
+        is_ready = true
       end
 
       # Check if key-value condition is met
@@ -194,7 +195,8 @@ module KubectlClient
         if namespace
           resource = KubectlClient::Get.resource(resource["kind"].as_s, resource.dig("metadata", "name").as_s)
         else
-          resource = KubectlClient::Get.resource(resource["kind"].as_s, resource.dig("metadata", "name").as_s, namespace)
+          resource = KubectlClient::Get.resource(resource["kind"].as_s, resource.dig("metadata", "name").as_s,
+            namespace: namespace)
         end
 
         if resource.dig?(*dig_params)
