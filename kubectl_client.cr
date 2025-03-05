@@ -21,20 +21,16 @@ module KubectlClient
 
   module ShellCMD
     # logger should have method name (any other scopes, if necessary) that is calling attached using .for() method.
-    def self.run(cmd, logger : ::Log = Log, force_output = false) : CMDResult
+    def self.run(cmd, logger : ::Log = Log) : CMDResult
       logger = logger.for("cmd")
-      logger.debug { "command: #{cmd}" }
+      logger.trace { "command: #{cmd}" }
       status = Process.run(
         cmd,
         shell: true,
         output: output = IO::Memory.new,
         error: stderr = IO::Memory.new
       )
-      if !force_output
-        logger.trace { "output: #{output}" }
-      else
-        logger.info { "output: #{output}" }
-      end
+      logger.trace { "output: #{output}" }
 
       # Don't have to output log line if stderr is empty
       if stderr.to_s.size > 1
@@ -44,20 +40,16 @@ module KubectlClient
       {status: status, output: output.to_s, error: stderr.to_s}
     end
 
-    def self.new(cmd, logger : ::Log = Log, force_output = false) : BackgroundCMDResult
+    def self.new(cmd, logger : ::Log = Log) : BackgroundCMDResult
       logger = logger.for("cmd-background")
-      logger.debug { "command: #{cmd}" }
+      logger.trace { "command: #{cmd}" }
       process = Process.new(
         cmd,
         shell: true,
         output: output = IO::Memory.new,
         error: stderr = IO::Memory.new
       )
-      if !force_output
-        logger.trace { "output: #{output}" }
-      else
-        logger.info { "output: #{output}" }
-      end
+      logger.trace { "output: #{output}" }
 
       # Don't have to output log line if stderr is empty
       if stderr.to_s.size > 1
@@ -119,5 +111,9 @@ module KubectlClient
 
     logger.info { "K8s server version is: #{version}" }
     version
+  end
+
+  def self.names_from_json_array_to_s(resource : Array(JSON::Any)) : String
+    resource.map { |item| item.dig?("metadata", "name") }.join(", ")
   end
 end

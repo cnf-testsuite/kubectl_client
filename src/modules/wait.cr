@@ -17,6 +17,8 @@ module KubectlClient
 
     def self.wait_for_terminations(namespace : String? = nil, wait_count : Int32 = 30) : Bool
       logger = @@logger.for("wait_for_terminations")
+      logger.debug { "Wait for terminations in ns #{namespace}" }
+
       cmd = "kubectl get all"
       # Check all namespaces by default
       cmd = namespace ? "#{cmd} -n #{namespace}" : "#{cmd} -A"
@@ -46,6 +48,8 @@ module KubectlClient
       kind : String, resource_name : String, condition : String, wait_count : Int32 = 180, namespace : String? = nil
     )
       logger = @@logger.for("wait_for_condition")
+      logger.info { "Wait for condition #{condition} in #{kind}/#{resource_name}" }
+
       cmd = "kubectl wait #{kind}/#{resource_name} --for=#{condition} --timeout=#{wait_count}s"
       cmd = "#{cmd} -n #{namespace}" if namespace
 
