@@ -242,7 +242,7 @@ module KubectlClient
       namespace : String? = nil
     )
       logger = @@logger.for("set_image")
-      logger.info { "Set image of container #{kind}/#{resource_name}/#{container_name} to #{image_name}" }
+      logger.info { "Set image of container #{resource_kind}/#{resource_name}/#{container_name} to #{image_name}" }
 
       cmd = version_tag ? 
         "kubectl set image #{resource_kind}/#{resource_name} #{container_name}=#{image_name}:#{version_tag}" :

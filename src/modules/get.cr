@@ -162,7 +162,7 @@ module KubectlClient
       if nodes == empty_json_any
         logger.notice { "Could not retrieve any nodes with #{full_resource} present" }
       else
-        logger.info { "Nodes with resource #{full_resource} list: #{names_from_json_array_to_s(nodes)}" }
+        logger.info { "Nodes with resource #{full_resource} list: #{KubectlClient.names_from_json_array_to_s(nodes)}" }
       end
 
       nodes
@@ -187,7 +187,7 @@ module KubectlClient
       if nodes == empty_json_any
         logger.notice { "Could not retrieve any node with pod/#{pod_name} present" }
       else
-        logger.info { "Nodes with pod/#{pod_name} list: #{names_from_json_array_to_s(nodes)}" }
+        logger.info { "Nodes with pod/#{pod_name} list: #{KubectlClient.names_from_json_array_to_s(nodes)}" }
       end
 
       nodes
@@ -347,7 +347,7 @@ module KubectlClient
           end
         end
       end
-      logger.info { "Matched #{matched_pods.size} pods: #{names_from_json_array_to_s(matched_pods)}" }
+      logger.info { "Matched #{matched_pods.size} pods: #{KubectlClient.names_from_json_array_to_s(matched_pods)}" }
 
       matched_pods
     end
