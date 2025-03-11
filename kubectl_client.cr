@@ -21,7 +21,7 @@ module KubectlClient
 
   module ShellCmd
     def self.run(cmd, log_prefix, force_output=false)
-      Log.info { "#{log_prefix} command: #{cmd}" }
+      Log.debug { "#{log_prefix} command: #{cmd}" }
       status = Process.run(
         cmd,
         shell: true,
@@ -36,7 +36,7 @@ module KubectlClient
 
       # Don't have to output log line if stderr is empty
       if stderr.to_s.size > 1
-        Log.info { "#{log_prefix} stderr: #{stderr.to_s}" }
+        Log.warn { "#{log_prefix} stderr: #{stderr.to_s}" }
       end
       {status: status, output: output.to_s, error: stderr.to_s}
     end
@@ -922,13 +922,13 @@ module KubectlClient
       case kind.downcase
       when "pod"
         pod_ready = KubectlClient::Get.pod_status(pod_name_prefix: resource_name, namespace: namespace, kubeconfig: kubeconfig).split(",")[2]
-        Log.info { "pod_ready: #{pod_ready}"}
         return pod_ready == "true"
+
       when "replicaset", "deployment", "statefulset"
         desired = replica_count(kind, namespace, resource_name, "{.status.replicas}", kubeconfig)
         unavailable = replica_count(kind, namespace, resource_name, "{.status.unavailableReplicas}", kubeconfig)
         current = replica_count(kind, namespace, resource_name, "{.status.readyReplicas}", kubeconfig)
-        Log.info { "current_replicas: #{current}, desired_replicas: #{desired}, unavailable_replicas: #{unavailable}"  }
+        Log.trace { "current_replicas: #{current}, desired_replicas: #{desired}, unavailable_replicas: #{unavailable}"  }
 
         ready = current == desired
 
@@ -944,7 +944,7 @@ module KubectlClient
         desired = replica_count(kind, namespace, resource_name, "{.status.desiredNumberScheduled}", kubeconfig)
         current = replica_count(kind, namespace, resource_name, "{.status.numberAvailable}", kubeconfig)
         unavailable = replica_count(kind, namespace, resource_name, "{.status.unavailableReplicas}", kubeconfig)
-        Log.info { "current_replicas: #{current}, desired_replicas: #{desired}" }
+        Log.trace { "current_replicas: #{current}, desired_replicas: #{desired}" }
 
         ready = current == desired
 
@@ -960,7 +960,7 @@ module KubectlClient
         desired = replica_count(kind, namespace, resource_name, "{.status.replicas}", kubeconfig)
         current = replica_count(kind, namespace, resource_name, "{.status.readyReplicas}", kubeconfig)
         unavailable = replica_count(kind, namespace, resource_name, "{.status.unavailableReplicas}", kubeconfig)
-        Log.info { "current_replicas: #{current}, desired_replicas: #{desired}" }
+        Log.trace { "current_replicas: #{current}, desired_replicas: #{desired}" }
 
         ready = current == desired
 
@@ -1059,32 +1059,36 @@ module KubectlClient
       is_ready = resource_ready?(kind, namespace, resource_name, kubeconfig)
 
       until is_ready || second_count > wait_count
-        Log.info { "KubectlClient::Get.resource_wait_for_install attempt: #{second_count}; is_ready: #{is_ready}" }
+        if second_count % RESOURCE_WAIT_LOG_INTERVAL == 0
+          Log.info { "KubectlClient::Get.resource_wait_for_install seconds elapsed: #{second_count}; is_ready: #{is_ready}" }
+        end
+
         sleep 1
         is_ready = resource_ready?(kind, namespace, resource_name, kubeconfig)
-        second_count = second_count + 1
+        second_count += 1
       end
 
       Log.info { "is_ready kind/resource #{kind}, #{resource_name}: #{is_ready}" }
       return is_ready
     end
 
-    #TODO add parameter and functionality that checks for individual pods to be successfully terminated
+    # TODO add parameter and functionality that checks for individual pods to be successfully terminated
     def self.resource_wait_for_uninstall(kind : String, resource_name : String, wait_count : Int32 = 180, namespace : String | Nil = "default")
-      # Not all cnfs have #{kind}.  some have only a pod.  need to check if the
-      # passed in pod has a deployment, if so, watch the deployment.  Otherwise watch the pod
+      # Not all CNFs have #{kind}. Some have only a pod. Need to check if the
+      # passed in pod has a deployment, if so, watch the deployment. Otherwise watch the pod.
       Log.info { "resource_wait_for_uninstall kind: #{kind} resource_name: #{resource_name} namespace: #{namespace}" }
       empty_hash = {} of String => JSON::Any
       second_count = 0
 
       resource_uninstalled = KubectlClient::Get.resource(kind, resource_name, namespace)
-      Log.debug { "resource_uninstalled #{resource_uninstalled}" }
       until (resource_uninstalled && resource_uninstalled.as_h == empty_hash) || second_count > wait_count
-        Log.info { "second_count = #{second_count}" }
+        if second_count % RESOURCE_WAIT_LOG_INTERVAL == 0
+          Log.info { "KubectlClient::Get.resource_wait_for_uninstall seconds elapsed: #{second_count}" }
+        end
+
         sleep 1
         resource_uninstalled = KubectlClient::Get.resource(kind, resource_name, namespace)
-        Log.debug { "resource_uninstalled #{resource_uninstalled}" }
-        second_count = second_count + 1
+        second_count += 1
       end
 
       if (resource_uninstalled && resource_uninstalled.as_h == empty_hash)
@@ -1142,16 +1146,17 @@ module KubectlClient
         # Check if the desired replicas is equal to the ready replicas.
         # Return true if yes.
         describe = Totem.from_yaml(resp)
-        Log.info { "desired_is_available describe: #{describe.inspect}" }
+        # TODO (rafal-lal): not sure if that is needed at all, will revisit later
+        Log.trace { "desired_is_available describe: #{describe.inspect}" }
         desired_replicas = describe.get("status").as_h["replicas"].as_i
-        Log.info { "desired_is_available desired_replicas: #{desired_replicas}" }
+        Log.trace { "desired_is_available desired_replicas: #{desired_replicas}" }
         ready_replicas = describe.get("status").as_h["readyReplicas"]?
         unless ready_replicas.nil?
           ready_replicas = ready_replicas.as_i
         else
           ready_replicas = 0
         end
-        Log.info { "desired_is_available ready_replicas: #{ready_replicas}" }
+        Log.trace { "desired_is_available ready_replicas: #{ready_replicas}" }
         return desired_replicas == ready_replicas
       when "pod"
         # Check if the pod status is ready.
@@ -1546,4 +1551,3 @@ module KubectlClient
     end
   end
 end
-
