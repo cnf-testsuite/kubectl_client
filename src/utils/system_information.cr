@@ -3,6 +3,7 @@ require "colorize"
 require "totem"
 require "./utils.cr"
 
+# TODO (rafal-lal): move stdout_ from here to main cnti
 def kubectl_installation(verbose = false, offline_mode = false)
   gmsg = "No Global kubectl version found"
   lmsg = "No Local kubectl version found"
